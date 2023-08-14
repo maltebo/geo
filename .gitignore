@@ -2,8 +2,4 @@
 /temp_data/
 /__pycache__/
 /data/__pycache__/
-/.idea/geo.iml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/vcs.xml
+/.idea/
