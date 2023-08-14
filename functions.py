@@ -1,3 +1,5 @@
+import os
+
 from geopy import Point, exc
 from ratelimit import limits, sleep_and_retry
 from geopy.geocoders import Nominatim
@@ -73,6 +75,8 @@ def load_clean_database():
         with open(clean_database_file, 'r') as fp:
             database = json.load(fp)
     except:
+        print(os.getcwd())
+        raise IndexError(f"Working directory seems to be wrong({os.getcwd()})")
         database = create_clean_db()
     return database
 
@@ -621,6 +625,8 @@ def create_clean_db(db=load_url_database()):
             }
 
     __save_clean_db(clean_db)
+
+    return clean_db
 
 
 # def temp_add_id(db=load_url_database()):
