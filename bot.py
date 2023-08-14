@@ -26,7 +26,8 @@ import functions as f
 # Enable logging
 
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    filename="private/geobot.log", encoding="utf-8", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
 )
 
 logger = logging.getLogger(__name__)
