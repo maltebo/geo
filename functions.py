@@ -10,11 +10,16 @@ import re
 import json
 import datetime
 
+import private.private_constants as pc
+
+def join(link):
+    return os.path.join(pc.ABS_PATH, link)
+
 from tqdm import tqdm
 
 gc = Nominatim(user_agent="pressmuenzen")
-url_database_file = "data/url_database.json"
-clean_database_file = "data/clean_database.json"
+url_database_file = join("data/url_database.json")
+clean_database_file = join("data/clean_database.json")
 MAINURL = "http://www.elongated-coin.de/phpBB3/viewforum.php?f=126"
 BASEURL = "http://www.elongated-coin.de/phpBB3/"
 
@@ -75,8 +80,6 @@ def load_clean_database():
         with open(clean_database_file, 'r') as fp:
             database = json.load(fp)
     except:
-        print(os.getcwd())
-        raise IndexError(f"Working directory seems to be wrong({os.getcwd()})")
         database = create_clean_db()
     return database
 

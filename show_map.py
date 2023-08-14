@@ -6,6 +6,10 @@ from folium.features import DivIcon
 import functions as f
 from random import randint
 
+import private.private_constants as pc
+
+def join(link):
+    return os.path.join(pc.ABS_PATH, link)
 
 def create_map_all_locations():
     loc = []
@@ -86,8 +90,8 @@ def create_map(origin, locations: list):
     # Set the map's view to fit the calculated bounds
     map.fit_bounds(bounds)
 
-    os.makedirs("temp_data", exist_ok=True)
-    link = f"temp_data/map_{randint(0, 2147483647)}.html"
+    os.makedirs(join("temp_data"), exist_ok=True)
+    link = join(f"temp_data/map_{randint(0, 2147483647)}.html")
 
     # Save the map as an image
     map.save(link)
