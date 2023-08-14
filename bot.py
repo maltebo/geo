@@ -19,14 +19,18 @@ from typing import Dict
 import data.telegram_constants as c
 import private.private_constants as pc
 
+def join(link):
+    return os.path.join(pc.ABS_PATH, link)
+
 import show_map
 
 import functions as f
 
 # Enable logging
 
+os.makedirs(join("private"), exist_ok=True)
 logging.basicConfig(
-    filename="private/geobot.log", encoding="utf-8", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename=join("private/geobot.log"), encoding="utf-8", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 
