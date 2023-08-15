@@ -1,3 +1,6 @@
+import os
+import io
+
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import (
     Application,
@@ -11,22 +14,25 @@ from telegram.ext import (
 
 import logging
 
-import os
-import io
-
-from typing import Dict
-
 import data.telegram_constants as c
 import private.private_constants as pc
+
+import show_map
+
+import functions as f
+
+import handle_userdata as user_data
+
+# Actions that can be taken
+START = "start"
+SUCHE = "suche"
+DETAILS = "details"
+GET_ALL = "get_all"
 
 
 def join(link):
     return os.path.join(pc.ABS_PATH, link)
 
-
-import show_map
-
-import functions as f
 
 # Enable logging
 
@@ -46,6 +52,8 @@ async def start(update: Update, context):
     logger.info("ENTERED START")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text=c.START_TEXT)
+
+    user_data.add_action(update.effective_chat.id, START, True)
 
 
 async def start_suche(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -79,6 +87,7 @@ async def get_points_or_radius(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text(
             f"{choice} war keine gültige Option. Bitte starte erneut und verwende die bereitgestellte Inline-Tastatur.")
+        user_data.add_action(update.effective_chat.id, SUCHE, False)
         return ConversationHandler.END
 
     return STANDORT
@@ -99,6 +108,7 @@ async def get_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import traceback
         traceback.print_exc()
         await update.message.reply_text("Da ist etwas schiefgegangen ...")
+        user_data.add_action(update.effective_chat.id, SUCHE, False)
         return ConversationHandler.END
 
     await update.message.reply_text(c.STANDORT_TEXT)
@@ -117,6 +127,7 @@ async def calculate_reply_location_data(update: Update, context: ContextTypes.DE
         import traceback
         traceback.print_exc()
         await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten, der Ort konnte nicht gefunden werden.")
+        user_data.add_action(update.effective_chat.id, SUCHE, False)
         return ConversationHandler.END
 
     context.user_data["location"] = loc
@@ -137,6 +148,7 @@ async def calculate_reply_string_data(update: Update, context: ContextTypes.DEFA
     if not loc:
         await update.message.reply_text(
             f"Da ist leider ein Fehler aufgetreten. Dieser Ort ({loc_text}) wird nicht gefunden!")
+        user_data.add_action(update.effective_chat.id, SUCHE, False)
         return ConversationHandler.END
 
     context.user_data["location"] = loc
@@ -156,6 +168,7 @@ async def calculate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(closest) < 1:
         await update.message.reply_text("Leider wurde kein Automat gefunden.")
+        user_data.add_action(update.effective_chat.id, SUCHE, False)
         return ConversationHandler.END
 
     link, result_string = show_map.create_map(context.user_data["location"], closest)
@@ -169,6 +182,8 @@ async def calculate_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_markdown(text=result_string)
 
     os.remove(link)
+
+    user_data.add_action(update.effective_chat.id, SUCHE, True)
 
     return ConversationHandler.END
 
@@ -184,6 +199,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=ReplyKeyboardRemove(),
     )
     user_data.clear()
+    user_data.add_action(update.effective_chat.id, SUCHE, False)
     return ConversationHandler.END
 
 
@@ -201,6 +217,8 @@ async def show_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     os.remove(link)
 
+    user_data.add_action(update.effective_chat.id, GET_ALL, True)
+
     return ConversationHandler.END
 
 
@@ -209,14 +227,17 @@ async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
                                         f"Bitte benutze diese Funktion folgendermaßen:\n/details <id>\n"
                                         f"Also zum Beispiel '/details 1894'")
+        user_data.add_action(update.effective_chat.id, DETAILS, False)
         return
 
     try:
         s = f.create_info_md(context.args[0])
         if not s:
             await update.message.reply_text(f"Die ID {context.args[0]} scheint nicht gefunden zu werden ...")
+            user_data.add_action(update.effective_chat.id, DETAILS, False)
             return
 
+        user_data.add_action(update.effective_chat.id, DETAILS, True)
         await update.message.reply_markdown(s)
 
     except:
@@ -224,6 +245,7 @@ async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
         traceback.print_exc()
         await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
                                         f"Bitte benutze diese Funktion folgendermaßen:\n/details <id>\n")
+        user_data.add_action(update.effective_chat.id, DETAILS, False)
         return
 
 

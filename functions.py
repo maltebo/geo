@@ -671,7 +671,7 @@ def create_info_md(id):
     if id not in db:
         return None
 
-    s = f"*ID*: id"
+    s = f"*ID*: {id}"
     for key, val in db[id].items():
         s += f"\n- *{key}*: _{val}_"
 
