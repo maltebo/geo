@@ -93,6 +93,8 @@ def create_map(origin, locations: list):
     os.makedirs(join("temp_data"), exist_ok=True)
     link = join(f"temp_data/map_{randint(0, 2147483647)}.html")
 
+    assert os.path.isfile(link)
+
     # Save the map as an image
     with open(link, 'wb') as fp:
         map.save(fp)
