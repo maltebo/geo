@@ -12,12 +12,15 @@ import datetime
 
 import private.private_constants as pc
 
+
 def join(link):
     return os.path.join(pc.ABS_PATH, link)
+
 
 from tqdm import tqdm
 
 gc = Nominatim(user_agent="pressmuenzen")
+
 url_database_file = join("data/url_database.json")
 clean_database_file = join("data/clean_database.json")
 MAINURL = "http://www.elongated-coin.de/phpBB3/viewforum.php?f=126"

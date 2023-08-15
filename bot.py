@@ -19,8 +19,10 @@ from typing import Dict
 import data.telegram_constants as c
 import private.private_constants as pc
 
+
 def join(link):
     return os.path.join(pc.ABS_PATH, link)
+
 
 import show_map
 
@@ -30,7 +32,8 @@ import functions as f
 
 os.makedirs(join("private"), exist_ok=True)
 logging.basicConfig(
-    filename=join("private/geobot.log"), encoding="utf-8", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename=join("private/geobot.log"), encoding="utf-8",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 
@@ -43,35 +46,6 @@ async def start(update: Update, context):
     logger.info("ENTERED START")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text=c.START_TEXT)
-
-
-# async def suche(update: Update, context):
-#     # Get the number of data points to be shown from the user's message
-#     try:
-#         num_points = int(context.args[0])
-#     except (IndexError, ValueError):
-#         await context.bot.send_message(chat_id=update.effective_chat.id,
-#                                        text='Invalid input. Please provide the number of data points to be shown.')
-#         return
-#
-#     # Get the user's location
-#     user_location = update.message.location
-#     if user_location is None:
-#         await context.bot.send_message(chat_id=update.effective_chat.id,
-#                                        text='Invalid input. Please provide a valid location.')
-#         return
-#
-#     # Call your existing function that returns an HTML document and a string
-#     closest = f.find_closest_n_points(user_location, num_points)
-#
-#     result_string = show_map.create_map(user_location, closest)
-#     with open("map.html", 'rb') as fp:
-#         html_doc = fp.read()
-#
-#     # Send the HTML document as a file and the result string as a message to the user
-#     await context.bot.send_document(chat_id=update.effective_chat.id, document=io.BytesIO(html_doc),
-#                                     filename='overview.html')
-#     await context.bot.send_message(chat_id=update.effective_chat.id, text=result_string)
 
 
 async def start_suche(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
