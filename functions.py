@@ -675,7 +675,6 @@ def create_info_md(id):
     for key, val in db[id].items():
         s += f"\n- *{key}*: _{val}_"
 
-    print(s)
     return str(s)
 
 
