@@ -94,7 +94,8 @@ def create_map(origin, locations: list):
     link = join(f"temp_data/map_{randint(0, 2147483647)}.html")
 
     # Save the map as an image
-    map.save(link)
+    with open(link, 'wb') as fp:
+        map.save(fp)
 
     return link, locations_to_string(origin, locations)
 
