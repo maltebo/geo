@@ -19,3 +19,9 @@ Diese muss zwei Dinge enthalten:
 
 Dann muss nur noch mit python 3.10 (andere Versionen können auch 
 funktionieren, wurden aber nicht getestet) bot.py ausgeführt werden.
+
+## Fehler
+
+Falls "Suche" nicht klappt, stelle sicher, dass der bot die 
+Berechtigung hat, in den Ordner "temp_data" zu schreiben und 
+daraus zu lesen.

@@ -678,6 +678,11 @@ def create_info_md(id):
     return str(s)
 
 
+def get_data(id):
+    db = load_clean_database()
+    return db.get(id, None)
+
+
 def __save_clean_db(db):
     with open(clean_database_file, "w") as fp:
         json.dump(db, fp, indent=2)

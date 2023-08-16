@@ -28,6 +28,8 @@ START = "start"
 SUCHE = "suche"
 DETAILS = "details"
 GET_ALL = "get_all"
+VISITED = "visited"
+NOT_VISITED = "not_visited"
 
 
 def join(link):
@@ -249,6 +251,72 @@ async def details(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+async def visited(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 1:
+        await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
+                                        f"Bitte benutze diese Funktion folgendermaßen:\n/besucht <id>\n"
+                                        f"Also zum Beispiel '/besucht 1894'")
+        user_data.add_action(update.effective_chat.id, VISITED, False)
+        return
+
+    try:
+        s = f.get_data(context.args[0])
+        if not s:
+            await update.message.reply_text(f"Die ID {context.args[0]} scheint nicht gefunden zu werden ...")
+            user_data.add_action(update.effective_chat.id, VISITED, False)
+            return
+
+        added = user_data.add_visited(update.effective_chat.id, context.args[0])
+        if not added:
+            await update.message.reply_text(f"Der Automat {s['name']} war schon als besucht markiert ...")
+            user_data.add_action(update.effective_chat.id, VISITED, False)
+            return
+
+        user_data.add_action(update.effective_chat.id, VISITED, True)
+        await update.message.reply_text(f"Der Automat {s['name']} wurde zu den besuchten Automaten hinzugefügt ...")
+
+    except:
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
+                                        f"Bitte benutze diese Funktion folgendermaßen:\n/besucht <id>\n")
+        user_data.add_action(update.effective_chat.id, VISITED, False)
+        return
+
+
+async def delete_visited(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 1:
+        await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
+                                        f"Bitte benutze diese Funktion folgendermaßen:\n/nicht_besucht <id>\n"
+                                        f"Also zum Beispiel '/nicht_besucht 1894'")
+        user_data.add_action(update.effective_chat.id, NOT_VISITED, False)
+        return
+
+    try:
+        s = f.get_data(context.args[0])
+        if not s:
+            await update.message.reply_text(f"Die ID {context.args[0]} scheint nicht gefunden zu werden ...")
+            user_data.add_action(update.effective_chat.id, NOT_VISITED, False)
+            return
+
+        removed = user_data.delete_visited(update.effective_chat.id, context.args[0])
+        if not removed:
+            await update.message.reply_text(f"Der Automat {s['name']} war noch nicht als besucht markiert ...")
+            user_data.add_action(update.effective_chat.id, NOT_VISITED, False)
+            return
+
+        user_data.add_action(update.effective_chat.id, NOT_VISITED, True)
+        await update.message.reply_text(f"Der Automat {s['name']} wurde aus den besuchten Automaten gelöscht ...")
+
+    except:
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(f"Da ist leider ein Fehler aufgetreten. "
+                                        f"Bitte benutze diese Funktion folgendermaßen:\n/nicht_besucht <id>\n")
+        user_data.add_action(update.effective_chat.id, NOT_VISITED, False)
+        return
+
+
 if __name__ == '__main__':
     application = ApplicationBuilder().token(pc.TOKEN).build()
 
@@ -260,6 +328,12 @@ if __name__ == '__main__':
 
     details_handler = CommandHandler('details', details)
     application.add_handler(details_handler)
+
+    visited_handler = CommandHandler('besucht', visited)
+    application.add_handler(visited_handler)
+
+    delete_visited_handler = CommandHandler('nicht_besucht', delete_visited)
+    application.add_handler(delete_visited_handler)
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('suche', start_suche)],

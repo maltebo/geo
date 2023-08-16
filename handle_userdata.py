@@ -55,6 +55,7 @@ def add_visited(chat_id, machine_id):
         return False
     chat_data[VISITED].append(machine_id)
     save_chat_data(chat_id, chat_data)
+    return True
 
 
 def delete_visited(chat_id, machine_id):
@@ -63,6 +64,7 @@ def delete_visited(chat_id, machine_id):
         return False
     chat_data[VISITED].remove(machine_id)
     save_chat_data(chat_id, chat_data)
+    return True
 
 
 def add_action(chat_id, action: str, successful: bool):
