@@ -3,10 +3,44 @@
 from __future__ import annotations
 
 from html import escape
+from typing import Any
+
+from telegram import Message, Update
+from telegram.ext import ContextTypes
 
 from pressmuenzen.config import get_settings
 from pressmuenzen.domain.models import Coordinate, MachineHit
 from pressmuenzen.services.maps import make_map_token
+
+
+def require_message(update: Update) -> Message:
+    """Narrow ``update.message`` to non-None.
+
+    PTB types the triggering message Optional, but our command/message handlers
+    are only ever registered for updates that carry one. Fail loudly if that
+    invariant is ever violated rather than silencing the type with an ignore.
+    """
+    message = update.message
+    assert message is not None, "handler invoked without a message"
+    return message
+
+
+def require_chat_id(update: Update) -> int:
+    chat = update.effective_chat
+    assert chat is not None, "handler invoked without an effective chat"
+    return chat.id
+
+
+def require_args(context: ContextTypes.DEFAULT_TYPE) -> list[str]:
+    """Command arguments, or an empty list when PTB supplies none."""
+    return context.args or []
+
+
+def require_user_data(context: ContextTypes.DEFAULT_TYPE) -> dict[Any, Any]:
+    """The per-user conversation state dict, narrowed to non-None."""
+    data = context.user_data
+    assert data is not None, "conversation handler invoked without user_data"
+    return data
 
 
 def hosted_map_url(origin: Coordinate, mode: str, value: float) -> str:

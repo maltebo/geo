@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select
+from typing import Any, cast
+
+from sqlalchemy import CursorResult, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,12 +37,12 @@ class UserRepository:
             self.session.add(user)
             await self.session.flush()
         else:
-            user.last_seen_at = func.now()  # type: ignore[assignment]
+            user.last_seen_at = func.now()
         return user
 
     async def set_home(self, telegram_chat_id: int, coord: Coordinate) -> User:
         user = await self.get_or_create(telegram_chat_id)
-        user.home_geom = point_wkt(coord)  # type: ignore[assignment]
+        user.home_geom = point_wkt(coord)
         await self.session.flush()
         return user
 
@@ -59,14 +61,17 @@ class UserRepository:
             .values(user_id=user.id, machine_id=machine_id)
             .on_conflict_do_nothing(index_elements=["user_id", "machine_id"])
         )
-        result = await self.session.execute(stmt)
+        result = cast("CursorResult[Any]", await self.session.execute(stmt))
         return result.rowcount > 0
 
     async def delete_visited(self, telegram_chat_id: int, machine_id: int) -> bool:
         """Return True if a row was removed, False if it was not marked visited."""
         user = await self.get_or_create(telegram_chat_id)
-        result = await self.session.execute(
-            delete(Visited).where(Visited.user_id == user.id, Visited.machine_id == machine_id)
+        result = cast(
+            "CursorResult[Any]",
+            await self.session.execute(
+                delete(Visited).where(Visited.user_id == user.id, Visited.machine_id == machine_id)
+            ),
         )
         return result.rowcount > 0
 

@@ -10,6 +10,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from pressmuenzen.bot import texts
+from pressmuenzen.bot.handlers.common import require_args, require_chat_id, require_message
 from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.corrections import CorrectionRepository
@@ -18,18 +19,19 @@ from pressmuenzen.services.corrections import CorrectionService
 
 
 def _is_admin(update: Update) -> bool:
-    return get_settings().is_admin(update.effective_chat.id)
+    return get_settings().is_admin(require_chat_id(update))
 
 
 async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = require_message(update)
     if not _is_admin(update):
-        await update.message.reply_text(texts.ADMIN_ONLY)
+        await message.reply_text(texts.ADMIN_ONLY)
         return
     async with session_scope() as session:
         pending = await CorrectionRepository(session).pending()
         machine_repo = MachineRepository(session)
         if not pending:
-            await update.message.reply_text(texts.QUEUE_EMPTY)
+            await message.reply_text(texts.QUEUE_EMPTY)
             return
         lines = [texts.QUEUE_HEADER]
         for c in pending:
@@ -37,20 +39,22 @@ async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             name = machine.name if machine else f"#{c.machine_id}"
             lines.append(f"#{c.id} [{c.type}] {name}: {c.comment or ''}")
         lines.append("\nAnnehmen: /ok <id>   Ablehnen: /nope <id>")
-    await update.message.reply_text("\n".join(lines))
+    await message.reply_text("\n".join(lines))
 
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = require_message(update)
     if not _is_admin(update):
-        await update.message.reply_text(texts.ADMIN_ONLY)
+        await message.reply_text(texts.ADMIN_ONLY)
         return
-    if len(context.args) != 1 or not context.args[0].isdigit():
-        await update.message.reply_text(texts.OK_USAGE)
+    args = require_args(context)
+    if len(args) != 1 or not args[0].isdigit():
+        await message.reply_text(texts.OK_USAGE)
         return
-    correction_id = int(context.args[0])
+    correction_id = int(args[0])
     async with session_scope() as session:
-        ok = await CorrectionService(session).approve(correction_id, update.effective_chat.id)
-    await update.message.reply_text(
+        ok = await CorrectionService(session).approve(correction_id, require_chat_id(update))
+    await message.reply_text(
         texts.CORRECTION_APPROVED.format(id=correction_id)
         if ok
         else texts.CORRECTION_NOT_FOUND.format(id=correction_id)
@@ -58,16 +62,18 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = require_message(update)
     if not _is_admin(update):
-        await update.message.reply_text(texts.ADMIN_ONLY)
+        await message.reply_text(texts.ADMIN_ONLY)
         return
-    if len(context.args) != 1 or not context.args[0].isdigit():
-        await update.message.reply_text(texts.NOPE_USAGE)
+    args = require_args(context)
+    if len(args) != 1 or not args[0].isdigit():
+        await message.reply_text(texts.NOPE_USAGE)
         return
-    correction_id = int(context.args[0])
+    correction_id = int(args[0])
     async with session_scope() as session:
-        ok = await CorrectionService(session).reject(correction_id, update.effective_chat.id)
-    await update.message.reply_text(
+        ok = await CorrectionService(session).reject(correction_id, require_chat_id(update))
+    await message.reply_text(
         texts.CORRECTION_REJECTED.format(id=correction_id)
         if ok
         else texts.CORRECTION_NOT_FOUND.format(id=correction_id)

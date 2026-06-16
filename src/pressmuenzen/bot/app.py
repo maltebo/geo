@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -19,12 +21,17 @@ from pressmuenzen.logging import configure_logging, get_logger
 
 log = get_logger("bot")
 
+# PTB's Application is generic over six type params (bot, context, the three
+# data stores, job queue). We don't specialise any of them, so alias the all-Any
+# form rather than spelling it out at the call site.
+_Application = Application[Any, Any, Any, Any, Any, Any]
+
 
 async def _on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     log.error("unhandled bot error", exc_info=context.error)
 
 
-def build_application() -> Application:
+def build_application() -> _Application:
     settings = get_settings()
     if not settings.telegram_token:
         raise RuntimeError("TELEGRAM_TOKEN is not set")

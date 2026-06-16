@@ -8,39 +8,46 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from pressmuenzen.bot import texts
-from pressmuenzen.bot.handlers.common import hosted_map_url
+from pressmuenzen.bot.handlers.common import (
+    hosted_map_url,
+    require_args,
+    require_chat_id,
+    require_message,
+)
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.domain.models import Coordinate
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(texts.START)
+    await require_message(update).reply_text(texts.START)
 
 
 async def whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Help users find their chat id (for ADMIN_CHAT_IDS configuration)."""
-    await update.message.reply_text(f"chat_id: {update.effective_chat.id}")
+    await require_message(update).reply_text(f"chat_id: {require_chat_id(update)}")
 
 
 async def show_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Centre the "all machines" map on a neutral point; the page fits bounds itself.
     url = hosted_map_url(Coordinate(lat=51.0, lon=10.0), "all", 0)
-    await update.message.reply_text(texts.MAP_ALL_READY.format(url=url))
+    await require_message(update).reply_text(texts.MAP_ALL_READY.format(url=url))
 
 
 async def details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if len(context.args) != 1 or not context.args[0].isdigit():
-        await update.message.reply_text(texts.DETAILS_USAGE)
+    message = require_message(update)
+    args = require_args(context)
+    if len(args) != 1 or not args[0].isdigit():
+        await message.reply_text(texts.DETAILS_USAGE)
         return
-    machine_id = int(context.args[0])
+    machine_id = int(args[0])
 
     async with session_scope() as session:
         hit = await MachineRepository(session).get_hit(machine_id)
         machine = await MachineRepository(session).get(machine_id)
 
     if machine is None:
-        await update.message.reply_text(texts.DETAILS_NOT_FOUND.format(id=machine_id))
+        await message.reply_text(texts.DETAILS_NOT_FOUND.format(id=machine_id))
         return
 
     # HTML mode with escaped values: forum text (name/description) is arbitrary
@@ -62,4 +69,4 @@ async def details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if machine.description:
         lines.append(row("Beschreibung", machine.description))
 
-    await update.message.reply_html("\n".join(lines))
+    await message.reply_html("\n".join(lines))

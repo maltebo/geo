@@ -98,7 +98,9 @@ def parse_map_token(token: str, *, now: float | None = None) -> dict[str, Any] |
     if not hmac.compare_digest(expected, sig_str):
         return None
     try:
-        payload = json.loads(base64.urlsafe_b64decode(body_str + "=" * (-len(body_str) % 4)))
+        payload: dict[str, Any] = json.loads(
+            base64.urlsafe_b64decode(body_str + "=" * (-len(body_str) % 4))
+        )
     except ValueError:  # covers json.JSONDecodeError and bad base64
         return None
     if payload.get("exp", 0) < (now or time.time()):

@@ -13,6 +13,7 @@ from hashlib import sha256
 
 import httpx
 from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
@@ -127,7 +128,7 @@ async def _upsert_machine(
         existing = await repo.get_by_url(machine.source_url)
 
         if existing is not None:
-            existing.last_seen_at = func.now()  # type: ignore[assignment]
+            existing.last_seen_at = func.now()
             if existing.content_hash == content_hash:
                 stats.machines_unchanged += 1
                 return False
@@ -166,9 +167,9 @@ async def _upsert_machine(
 
 async def _derive_coordinates(
     repo: MachineRepository,
-    session,
+    session: AsyncSession,
     machine_id: int,
-    machine: ScrapedMachine,  # type: ignore[no-untyped-def]
+    machine: ScrapedMachine,
 ) -> None:
     """Add forum-GPS and/or geocoded candidates, then recompute precedence."""
     # 1. Forum GPS text (highest non-corrected precedence).

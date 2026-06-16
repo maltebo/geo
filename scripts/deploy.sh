@@ -15,9 +15,7 @@ PREV_TAG="$(grep -oE '[0-9a-f]{40}' .env.deploy 2>/dev/null || true)"
 echo "IMAGE_TAG=${TAG}" > .env.deploy
 set -a; . ./.env; . ./.env.deploy; set +a
 
-# GHCR pull (read-only token lives in .env as GHCR_USER / GHCR_TOKEN).
-echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-
+# GHCR image is public; pulls are anonymous, no docker login required.
 docker compose --env-file .env --env-file .env.deploy pull
 # Migrate BEFORE swapping running services.
 docker compose --env-file .env --env-file .env.deploy run --rm migrate

@@ -55,7 +55,7 @@ class CorrectionRepository:
         if correction is None:
             return None
         correction.status = status
-        correction.reviewed_at = func.now()  # type: ignore[assignment]
+        correction.reviewed_at = func.now()
         correction.reviewed_by = reviewer_chat_id
         await self.session.flush()
         return correction

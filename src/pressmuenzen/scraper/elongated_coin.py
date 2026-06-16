@@ -84,7 +84,7 @@ class ElongatedCoinSource:
     async def _collect_topics(self, page_url: str, acc: list[TopicRef]) -> None:
         soup = await self._soup(page_url)
         container = soup.find(lambda tag: tag.name == "div" and tag.get("class") == ["forumbg"])
-        if container is None:
+        if not isinstance(container, Tag):
             return
         for link in container.find_all("a", class_="topictitle", href=True):
             acc.append(TopicRef(url=self._complete_link(link), name=link.text.strip()))
@@ -102,7 +102,7 @@ class ElongatedCoinSource:
         pages = soup.find_all("div", class_="pagination")
         if len(pages) < 1:
             return True
-        words = pages[0].text.split(" ")
+        words: list[str] = pages[0].text.split(" ")
         try:
             index = words.index("Seite")
         except ValueError:
@@ -114,7 +114,7 @@ class ElongatedCoinSource:
     async def fetch_machine(self, topic: TopicRef, region: ScrapedRegion) -> ScrapedMachine | None:
         soup = await self._soup(topic.url)
         first_post = soup.find("div", class_=re.compile(r"post bg[12].*"))
-        if first_post is None:
+        if not isinstance(first_post, Tag):
             return None
 
         if not first_post.find("span", string=re.compile("Standortbeschreibung.*")):
@@ -130,7 +130,7 @@ class ElongatedCoinSource:
         gps_text = self._gps_text(first_post)
         entry_date = None
         author = first_post.find("p", class_="author")
-        if author and "»" in author.text:
+        if isinstance(author, Tag) and "»" in author.text:
             entry_date = author.text.split("»")[1].strip()
 
         return ScrapedMachine(
@@ -149,7 +149,7 @@ class ElongatedCoinSource:
             return ""
         text = ""
         node = address.next
-        while not str(node).startswith('<span style="font-weight: bold'):
+        while node is not None and not str(node).startswith('<span style="font-weight: bold'):
             node = node.next
             if node is None:
                 break
@@ -167,7 +167,7 @@ class ElongatedCoinSource:
             return ""
         text = ""
         node = gps.next
-        while not str(node).startswith('<span style="font-weight: bold'):
+        while node is not None and not str(node).startswith('<span style="font-weight: bold'):
             node = node.next
             if node is None:
                 break

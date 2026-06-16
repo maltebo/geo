@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +20,8 @@ from pressmuenzen.domain.models import (
 from pressmuenzen.domain.precedence import resolve
 
 
-def _row_to_hit(row: object, distance_m_value: float | None = None) -> MachineHit:
-    m, region_name, lat, lon = tuple(row)  # type: ignore[misc]
+def _row_to_hit(row: Sequence[Any], distance_m_value: float | None = None) -> MachineHit:
+    m, region_name, lat, lon = row
     return MachineHit(
         id=m.id,
         name=m.name,
@@ -171,7 +174,7 @@ class MachineRepository:
         if machine is None:
             return
         machine.gps_source = source
-        machine.geom = point_wkt(coord) if coord is not None else None  # type: ignore[assignment]
+        machine.geom = point_wkt(coord) if coord is not None else None
         await self.session.flush()
 
     async def clear_candidates_of_source(self, machine_id: int, source: GpsSource) -> None:

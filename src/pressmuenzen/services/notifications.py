@@ -7,7 +7,9 @@ notifications_sent for idempotency.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from typing import Any, cast
+
+from sqlalchemy import CursorResult, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,7 +70,7 @@ async def _record_once(session: AsyncSession, user_id: int, machine_id: int) -> 
         .values(user_id=user_id, machine_id=machine_id, kind=KIND_NEW_MACHINE)
         .on_conflict_do_nothing(constraint="uq_notification_idem")
     )
-    result = await session.execute(stmt)
+    result = cast("CursorResult[Any]", await session.execute(stmt))
     return result.rowcount > 0
 
 
