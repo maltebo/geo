@@ -58,6 +58,12 @@ class Settings(BaseSettings):
         default=0.85, alias="SCRAPER_CANARY_MIN_PARSE_RATE"
     )
 
+    # Moderation
+    # A machine the scraper has not re-seen for this many days is surfaced by the
+    # admin /stale command for human review. Nothing is auto-deleted: forum threads
+    # outlive the physical machine, so absence is only a hint, never a verdict.
+    stale_after_days: int = Field(default=60, alias="STALE_AFTER_DAYS")
+
     # Logging
     log_format: str = Field(default="json", alias="LOG_FORMAT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

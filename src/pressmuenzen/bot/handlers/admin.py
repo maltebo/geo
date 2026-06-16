@@ -1,10 +1,12 @@
-"""Admin moderation commands: /queue, /ok, /nope.
+"""Admin moderation commands: /queue, /ok, /nope, /stale, /entfernen.
 
 Admin rights are derived from the configured ADMIN_CHAT_IDS list (config), never
 from a DB column. Adding an admin = editing one env value and restarting.
 """
 
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -15,6 +17,7 @@ from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.corrections import CorrectionRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
+from pressmuenzen.domain.models import MachineStatus
 from pressmuenzen.services.corrections import CorrectionService
 from pressmuenzen.services.notifications import notify_admins
 
@@ -88,3 +91,58 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if ok
         else texts.CORRECTION_NOT_FOUND.format(id=correction_id)
     )
+
+
+async def stale(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List active locations the scraper has not re-seen for a while, for review.
+
+    Read-only: this only surfaces candidates. Removing one is the admin's explicit
+    /entfernen decision, never automatic, because forum threads outlive the machine.
+    """
+    message = require_message(update)
+    if not _is_admin(update):
+        await message.reply_text(texts.ADMIN_ONLY)
+        return
+    threshold = get_settings().stale_after_days
+    now = datetime.now(UTC)
+    async with session_scope() as session:
+        machines = await MachineRepository(session).stale(threshold)
+        if not machines:
+            await message.reply_text(texts.STALE_NONE)
+            return
+        lines = [texts.STALE_HEADER.format(days=threshold)]
+        lines += [
+            texts.STALE_ITEM.format(id=m.id, name=m.name, days=(now - m.last_seen_at).days)
+            for m in machines
+        ]
+        lines.append(texts.STALE_FOOTER)
+    await message.reply_text("\n".join(lines))
+
+
+async def remove(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Soft-delete a location (status -> GONE). Used to act on /stale findings."""
+    message = require_message(update)
+    if not _is_admin(update):
+        await message.reply_text(texts.ADMIN_ONLY)
+        return
+    args = require_args(context)
+    if len(args) != 1 or not args[0].isdigit():
+        await message.reply_text(texts.REMOVE_USAGE)
+        return
+    machine_id = int(args[0])
+    removed_name: str | None = None
+    async with session_scope() as session:
+        repo = MachineRepository(session)
+        machine = await repo.get(machine_id)
+        if machine is None:
+            reply = texts.DETAILS_NOT_FOUND.format(id=machine_id)
+        elif machine.status is MachineStatus.GONE:
+            reply = texts.REMOVE_ALREADY_GONE.format(id=machine_id)
+        else:
+            await repo.mark_gone(machine_id)
+            removed_name = machine.name
+            reply = texts.REMOVE_DONE.format(id=machine_id, name=removed_name)
+    await message.reply_text(reply)
+    # Mirror the corrections-driven deletion: every admin learns about the removal.
+    if removed_name is not None:
+        await notify_admins(texts.NOTIFY_ADMIN_DELETED.format(id=machine_id, name=removed_name))

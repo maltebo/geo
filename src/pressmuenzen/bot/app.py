@@ -56,6 +56,8 @@ def build_application() -> _Application:
     app.add_handler(CommandHandler("queue", admin.queue))
     app.add_handler(CommandHandler("ok", admin.approve))
     app.add_handler(CommandHandler("nope", admin.reject))
+    app.add_handler(CommandHandler("stale", admin.stale))
+    app.add_handler(CommandHandler("entfernen", admin.remove))
 
     # /suche conversation.
     app.add_handler(

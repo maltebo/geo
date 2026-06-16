@@ -88,3 +88,15 @@ CORRECTION_NOT_FOUND = "Meldung {id} wurde nicht gefunden."
 NOTIFY_ADMIN_ADDED = "Neue Standorte hinzugefügt ({count}):"
 NOTIFY_ADMIN_ADDED_ITEM = "#{id} {name}\n{url}"
 NOTIFY_ADMIN_DELETED = "Standort entfernt: #{id} {name}"
+
+# Stale-location review (/stale) and admin removal (/entfernen)
+STALE_NONE = "Keine veralteten Standorte: alle wurden kürzlich in der Quelle gesehen."
+STALE_HEADER = "Seit über {days} Tagen nicht mehr in der Quelle gesehen:"
+STALE_ITEM = "#{id} {name} – zuletzt vor {days} Tagen"
+STALE_FOOTER = (
+    "\nDas heißt nicht zwingend, dass der Automat weg ist (Forenthemen bleiben oft "
+    "bestehen). Bei Bedarf entfernen mit: /entfernen <id>"
+)
+REMOVE_USAGE = "Bitte benutze: /entfernen <id>\nZum Beispiel: /entfernen 1894"
+REMOVE_DONE = "Standort #{id} ({name}) wurde entfernt."
+REMOVE_ALREADY_GONE = "Standort #{id} ist bereits entfernt."

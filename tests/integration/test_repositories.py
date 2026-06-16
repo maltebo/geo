@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from pressmuenzen.db.models import Machine
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.db.repositories.users import UserRepository
-from pressmuenzen.domain.models import Coordinate, GpsSource
+from pressmuenzen.domain.models import Coordinate, GpsSource, MachineStatus
 
 pytestmark = pytest.mark.integration
 
@@ -60,3 +62,20 @@ async def test_visited_roundtrip(db_session) -> None:  # type: ignore[no-untyped
     assert await users.add_visited(42, 1000) is False  # idempotent
     assert 1000 in await users.visited_machine_ids(42)
     assert await users.delete_visited(42, 1000) is True
+
+
+async def test_stale_lists_only_old_active_and_mark_gone(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = MachineRepository(db_session)
+    old = datetime.now(UTC) - timedelta(days=90)
+    db_session.add(Machine(id=2000, source_url="u2000", name="Old", last_seen_at=old))
+    db_session.add(Machine(id=2001, source_url="u2001", name="Fresh"))  # last_seen defaults to now
+    await db_session.flush()
+
+    assert [m.id for m in await repo.stale(60)] == [2000]
+
+    gone = await repo.mark_gone(2000)
+    assert gone is not None
+    assert gone.status is MachineStatus.GONE
+    # A GONE machine drops off the stale list (stale only considers ACTIVE).
+    assert await repo.stale(60) == []
+    assert await repo.mark_gone(99999) is None

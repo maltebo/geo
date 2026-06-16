@@ -20,7 +20,6 @@ from pressmuenzen.domain.models import (
     CorrectionStatus,
     CorrectionType,
     GpsSource,
-    MachineStatus,
 )
 from pressmuenzen.logging import get_logger
 
@@ -69,10 +68,8 @@ class CorrectionService:
                 )
                 await self.machines.recompute_geom(correction.machine_id)
         elif correction.type is CorrectionType.GONE:
-            machine = await self.machines.get(correction.machine_id)
+            machine = await self.machines.mark_gone(correction.machine_id)
             if machine is not None:
-                machine.status = MachineStatus.GONE
-                await self.session.flush()
                 deleted_id = machine.id
                 deleted_name = machine.name
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, select
@@ -118,7 +119,35 @@ class MachineRepository:
         rows = (await self.session.execute(stmt)).all()
         return [_row_to_hit(r[:4], r[4]) for r in rows]
 
+    async def stale(self, threshold_days: int) -> list[Machine]:
+        """Active machines the scraper has not re-seen for ``threshold_days`` days.
+
+        Oldest first. A read-time view for admin review; it changes no state. A
+        machine re-seen by a later scrape refreshes ``last_seen_at`` and drops off
+        this list on its own, so there is nothing to undo.
+        """
+        cutoff = datetime.now(UTC) - timedelta(days=threshold_days)
+        rows = await self.session.execute(
+            select(Machine)
+            .where(Machine.status == MachineStatus.ACTIVE, Machine.last_seen_at < cutoff)
+            .order_by(Machine.last_seen_at)
+        )
+        return list(rows.scalars().all())
+
     # --- writes --------------------------------------------------------------
+
+    async def mark_gone(self, machine_id: int) -> Machine | None:
+        """Soft-delete a machine (status -> GONE). Returns it, or None if absent.
+
+        Soft, never a row delete: keeps the legacy loc_ID stable and preserves
+        users' visited history and corrections (all FK-CASCADE off machines.id).
+        """
+        machine = await self.session.get(Machine, machine_id)
+        if machine is None:
+            return None
+        machine.status = MachineStatus.GONE
+        await self.session.flush()
+        return machine
 
     async def upsert_region(
         self, source_forum_url: str, name: str, is_limited_section: bool
