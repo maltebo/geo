@@ -16,6 +16,7 @@ from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.corrections import CorrectionRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.services.corrections import CorrectionService
+from pressmuenzen.services.notifications import notify_admins
 
 
 def _is_admin(update: Update) -> bool:
@@ -53,12 +54,21 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     correction_id = int(args[0])
     async with session_scope() as session:
-        ok = await CorrectionService(session).approve(correction_id, require_chat_id(update))
+        result = await CorrectionService(session).approve(correction_id, require_chat_id(update))
     await message.reply_text(
         texts.CORRECTION_APPROVED.format(id=correction_id)
-        if ok
+        if result.applied
         else texts.CORRECTION_NOT_FOUND.format(id=correction_id)
     )
+    # A removed location is a catalogue change every admin should see, even the
+    # one who just approved it (there may be several). Sent after commit so the
+    # alert never outruns the persisted status change.
+    if result.deleted_machine_name is not None:
+        await notify_admins(
+            texts.NOTIFY_ADMIN_DELETED.format(
+                id=result.deleted_machine_id, name=result.deleted_machine_name
+            )
+        )
 
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

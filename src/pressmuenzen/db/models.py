@@ -46,7 +46,18 @@ _corr_status_enum = Enum(
     CorrectionStatus, name="correction_status", values_callable=lambda e: [m.value for m in e]
 )
 
-_Point = Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
+
+def _point() -> Geometry:
+    """A fresh PostGIS POINT type for one column.
+
+    geoalchemy2's ``Geometry`` propagates its own ``nullable`` onto the column
+    when it is attached. Sharing a single instance across columns therefore lets
+    a ``NOT NULL`` geometry column (e.g. ``coordinate_candidates.geom``) flip the
+    nullability of every other geometry column, including the nullable ones like
+    ``users.home_geom``. A new instance per column keeps them isolated so the
+    per-column ``nullable=`` actually holds.
+    """
+    return Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
 
 
 class Base(DeclarativeBase):
@@ -91,7 +102,7 @@ class Machine(Base):
         _status_enum, default=MachineStatus.ACTIVE, nullable=False
     )
     is_limited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    geom: Mapped[str | None] = mapped_column(_Point, nullable=True)
+    geom: Mapped[str | None] = mapped_column(_point(), nullable=True)
     gps_source: Mapped[GpsSource] = mapped_column(
         _gps_source_enum, default=GpsSource.NONE, nullable=False
     )
@@ -119,7 +130,7 @@ class CoordinateCandidate(Base, TimestampMixin):
         ForeignKey("machines.id", ondelete="CASCADE"), nullable=False, index=True
     )
     source: Mapped[GpsSource] = mapped_column(_gps_source_enum, nullable=False)
-    geom: Mapped[str] = mapped_column(_Point, nullable=False)
+    geom: Mapped[str] = mapped_column(_point(), nullable=False)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     machine: Mapped[Machine] = relationship(back_populates="candidates")
@@ -132,7 +143,7 @@ class User(Base, TimestampMixin):
     telegram_chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    home_geom: Mapped[str | None] = mapped_column(_Point, nullable=True)
+    home_geom: Mapped[str | None] = mapped_column(_point(), nullable=True)
     notify_radius_km: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
     muted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(
@@ -168,7 +179,7 @@ class Watch(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    center_geom: Mapped[str] = mapped_column(_Point, nullable=False)
+    center_geom: Mapped[str] = mapped_column(_point(), nullable=False)
     radius_km: Mapped[float] = mapped_column(Float, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -184,7 +195,7 @@ class Correction(Base, TimestampMixin):
     )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     type: Mapped[CorrectionType] = mapped_column(_corr_type_enum, nullable=False)
-    proposed_geom: Mapped[str | None] = mapped_column(_Point, nullable=True)
+    proposed_geom: Mapped[str | None] = mapped_column(_point(), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[CorrectionStatus] = mapped_column(
         _corr_status_enum, default=CorrectionStatus.PENDING, nullable=False
@@ -216,7 +227,7 @@ class GeocodeCache(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     query: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
-    geom: Mapped[str | None] = mapped_column(_Point, nullable=True)
+    geom: Mapped[str | None] = mapped_column(_point(), nullable=True)
     provider: Mapped[str] = mapped_column(String(64), default="nominatim", nullable=False)
 
 

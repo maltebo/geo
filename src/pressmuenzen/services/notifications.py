@@ -110,3 +110,53 @@ async def notify_new_machines(machine_ids: list[int]) -> int:
                         log.warning("notify send failed", chat_id=chat_id, error=str(exc))
     log.info("notifications dispatched", sent=sent, machines=len(machine_ids))
     return sent
+
+
+async def notify_admins(message: str) -> int:
+    """Send a one-off message to every configured admin chat. Returns messages sent.
+
+    Single funnel for all admin alerts (catalogue changes, scrape aborts) so the
+    ``[Pressmuenzen]`` prefix and per-recipient error handling live in one place.
+    """
+    settings = get_settings()
+    if not settings.telegram_token or not settings.admin_chat_ids:
+        log.warning("cannot notify admins; token or ADMIN_CHAT_IDS missing", message=message)
+        return 0
+
+    from telegram import Bot
+
+    sent = 0
+    bot = Bot(settings.telegram_token)
+    async with bot:
+        for chat_id in settings.admin_chat_ids:
+            try:
+                await bot.send_message(chat_id=chat_id, text=f"[Pressmuenzen] {message}")
+                sent += 1
+            except Exception as exc:  # noqa: BLE001
+                log.warning("admin notify failed", chat_id=chat_id, error=str(exc))
+    return sent
+
+
+async def notify_admins_machines_added(machine_ids: list[int]) -> int:
+    """Tell admins which locations were newly added in a scrape (one summary message)."""
+    if not machine_ids:
+        return 0
+
+    from pressmuenzen.db.engine import session_scope
+
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                select(Machine.id, Machine.name, Machine.source_url)
+                .where(Machine.id.in_(machine_ids))
+                .order_by(Machine.id)
+            )
+        ).all()
+
+    if not rows:
+        return 0
+    items = [
+        texts.NOTIFY_ADMIN_ADDED_ITEM.format(id=mid, name=name, url=url) for mid, name, url in rows
+    ]
+    body = texts.NOTIFY_ADMIN_ADDED.format(count=len(items)) + "\n\n" + "\n\n".join(items)
+    return await notify_admins(body)

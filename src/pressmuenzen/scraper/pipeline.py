@@ -15,7 +15,6 @@ import httpx
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.models import Machine, ScrapeRun
 from pressmuenzen.db.repositories.corrections import ScrapeRunRepository
@@ -82,9 +81,14 @@ async def run_scrape(mode: str = "incremental") -> ScrapeStats:
         return stats
 
     if new_machine_ids:
-        from pressmuenzen.services.notifications import notify_new_machines
+        from pressmuenzen.services.notifications import (
+            notify_admins_machines_added,
+            notify_new_machines,
+        )
 
         await notify_new_machines(new_machine_ids)
+        # Admins always learn about catalogue growth, independent of any watch.
+        await notify_admins_machines_added(new_machine_ids)
 
     return stats
 
@@ -199,16 +203,6 @@ async def _derive_coordinates(
 
 
 async def _alert_admins(message: str) -> None:
-    settings = get_settings()
-    if not settings.telegram_token or not settings.admin_chat_ids:
-        log.warning("cannot alert admins", message=message)
-        return
-    try:
-        from telegram import Bot
+    from pressmuenzen.services.notifications import notify_admins
 
-        bot = Bot(settings.telegram_token)
-        async with bot:
-            for chat_id in settings.admin_chat_ids:
-                await bot.send_message(chat_id=chat_id, text=f"[Pressmuenzen] {message}")
-    except Exception as exc:  # noqa: BLE001
-        log.error("admin alert failed", error=str(exc))
+    await notify_admins(message)

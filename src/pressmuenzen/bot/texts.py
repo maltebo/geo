@@ -83,3 +83,8 @@ NOPE_USAGE = "Bitte benutze: /nope <correction_id>"
 CORRECTION_APPROVED = "Meldung {id} wurde angenommen."
 CORRECTION_REJECTED = "Meldung {id} wurde abgelehnt."
 CORRECTION_NOT_FOUND = "Meldung {id} wurde nicht gefunden."
+
+# Admin catalogue-change notifications (always sent to ADMIN_CHAT_IDS)
+NOTIFY_ADMIN_ADDED = "Neue Standorte hinzugefügt ({count}):"
+NOTIFY_ADMIN_ADDED_ITEM = "#{id} {name}\n{url}"
+NOTIFY_ADMIN_DELETED = "Standort entfernt: #{id} {name}"
