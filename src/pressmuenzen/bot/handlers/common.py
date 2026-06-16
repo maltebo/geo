@@ -8,9 +8,14 @@ from typing import Any
 from telegram import Message, Update
 from telegram.ext import ContextTypes
 
+from pressmuenzen.bot import texts
 from pressmuenzen.config import get_settings
-from pressmuenzen.domain.models import Coordinate, MachineHit
+from pressmuenzen.domain.models import Coordinate, MachineHit, MachineStatus, MachineTextMatch
 from pressmuenzen.services.maps import make_map_token
+
+# Max rows a /finden text search returns. Shared so the repo query and the
+# "result truncated" hint in the formatter can never drift apart.
+TEXT_SEARCH_LIMIT = 25
 
 
 def require_message(update: Update) -> Message:
@@ -64,4 +69,25 @@ def result_list_html(hits: list[MachineHit], origin_label: str | None = None) ->
         lines.append(line)
     if len(hits) > 15:
         lines.append("... (nur die ersten 15 Einträge werden angezeigt)")
+    return "\n".join(lines)
+
+
+def find_result_html(query: str, matches: list[MachineTextMatch]) -> str:
+    """Render /finden results as HTML, flagging rows that are missing from the map.
+
+    Names are forum-sourced and arbitrary, so everything is ``html.escape``d. Each
+    line shows the id (for /details, /besucht, /melden) and, when a machine is not
+    visible on the map, *why*: removed vs no coordinates.
+    """
+    lines = [texts.FIND_HEADER.format(query=escape(query), count=len(matches))]
+    for m in matches:
+        if m.status is MachineStatus.GONE:
+            flag = texts.FIND_FLAG_GONE
+        elif not m.on_map:
+            flag = texts.FIND_FLAG_NO_COORDS
+        else:
+            flag = ""
+        lines.append(f"<b>{m.id}</b>: {escape(m.name)}{flag}")
+    if len(matches) >= TEXT_SEARCH_LIMIT:
+        lines.append(texts.FIND_TRUNCATED.format(limit=TEXT_SEARCH_LIMIT))
     return "\n".join(lines)

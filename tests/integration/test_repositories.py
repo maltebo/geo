@@ -79,3 +79,37 @@ async def test_stale_lists_only_old_active_and_mark_gone(db_session) -> None:  #
     # A GONE machine drops off the stale list (stale only considers ACTIVE).
     assert await repo.stale(60) == []
     assert await repo.mark_gone(99999) is None
+
+
+async def test_search_by_name_finds_offmap_and_flags_them(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = MachineRepository(db_session)
+    db_session.add(Machine(id=3000, source_url="u3000", name="Hamburger Dom"))
+    db_session.add(Machine(id=3001, source_url="u3001", name="Hamburger Hafen"))  # no coords
+    db_session.add(Machine(id=3002, source_url="u3002", name="Bremen Markt"))
+    await db_session.flush()
+    # 3000 gets a coordinate and is on the map; 3001 stays coordinate-less.
+    await repo.add_candidate(3000, GpsSource.FORUM_GPS, KOELN)
+    await repo.recompute_geom(3000)
+    await repo.mark_gone(3002)  # matches a different term, used below
+
+    matches = await repo.search_by_name("hamburger")  # case-insensitive
+    by_id = {m.id: m for m in matches}
+    assert set(by_id) == {3000, 3001}
+    assert by_id[3000].on_map is True
+    assert by_id[3001].on_map is False  # surfaced precisely because it is missing
+    assert by_id[3001].status is MachineStatus.ACTIVE
+
+    # A removed machine is still found (so an admin can see it was removed).
+    gone_matches = await repo.search_by_name("bremen")
+    assert [(m.id, m.status, m.on_map) for m in gone_matches] == [(3002, MachineStatus.GONE, False)]
+
+    # %/_ are treated literally, not as SQL wildcards.
+    assert await repo.search_by_name("%") == []
+
+
+async def test_search_by_name_respects_limit(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = MachineRepository(db_session)
+    for i in range(5):
+        db_session.add(Machine(id=4000 + i, source_url=f"u400{i}", name=f"Kiosk {i}"))
+    await db_session.flush()
+    assert len(await repo.search_by_name("kiosk", limit=3)) == 3

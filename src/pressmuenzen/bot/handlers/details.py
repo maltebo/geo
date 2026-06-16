@@ -9,6 +9,8 @@ from telegram.ext import ContextTypes
 
 from pressmuenzen.bot import texts
 from pressmuenzen.bot.handlers.common import (
+    TEXT_SEARCH_LIMIT,
+    find_result_html,
     hosted_map_url,
     require_args,
     require_chat_id,
@@ -32,6 +34,28 @@ async def show_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Centre the "all machines" map on a neutral point; the page fits bounds itself.
     url = hosted_map_url(Coordinate(lat=51.0, lon=10.0), "all", 0)
     await require_message(update).reply_text(texts.MAP_ALL_READY.format(url=url))
+
+
+async def find(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Free-text name search over the catalogue (incl. machines missing from the map).
+
+    A diagnostic/lookup tool: given a term it returns matching ids and flags any
+    result that is removed or has no coordinate, which is why it would not appear
+    on the map or in /suche.
+    """
+    message = require_message(update)
+    query = " ".join(require_args(context)).strip()
+    if len(query) < 2:
+        await message.reply_text(texts.FIND_USAGE)
+        return
+
+    async with session_scope() as session:
+        matches = await MachineRepository(session).search_by_name(query, TEXT_SEARCH_LIMIT)
+
+    if not matches:
+        await message.reply_text(texts.FIND_NONE.format(query=query))
+        return
+    await message.reply_html(find_result_html(query, matches))
 
 
 async def details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

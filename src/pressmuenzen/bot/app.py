@@ -43,6 +43,7 @@ def build_application() -> _Application:
     app.add_handler(CommandHandler("whoami", details.whoami))
     app.add_handler(CommandHandler("alle_zeigen", details.show_all))
     app.add_handler(CommandHandler("details", details.details))
+    app.add_handler(CommandHandler("finden", details.find))
     app.add_handler(CommandHandler("besucht", visited.mark_visited))
     app.add_handler(CommandHandler("nicht_besucht", visited.unmark_visited))
 

@@ -17,6 +17,7 @@ from pressmuenzen.domain.models import (
     GpsSource,
     MachineHit,
     MachineStatus,
+    MachineTextMatch,
 )
 from pressmuenzen.domain.precedence import resolve
 
@@ -85,6 +86,33 @@ class MachineRepository:
         )
         rows = (await self.session.execute(stmt)).all()
         return [_row_to_hit(r) for r in rows]
+
+    async def search_by_name(self, query: str, limit: int = 25) -> list[MachineTextMatch]:
+        """Case-insensitive substring search over machine names (titles).
+
+        Deliberately does NOT apply the map filters (geom present, not GONE): the
+        point of this search is to find machines that are missing from the map, so
+        coordinate-less and removed rows are exactly what must show up. ``%``/``_``
+        in the user's term are treated literally, not as SQL wildcards.
+        """
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
+        stmt = (
+            select(Machine.id, Machine.name, Machine.status, Machine.geom.isnot(None))
+            .where(Machine.name.ilike(like, escape="\\"))
+            .order_by(Machine.name)
+            .limit(limit)
+        )
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            MachineTextMatch(
+                id=mid,
+                name=name,
+                status=status,
+                on_map=has_geom and status != MachineStatus.GONE,
+            )
+            for mid, name, status, has_geom in rows
+        ]
 
     async def nearest_n(self, origin: Coordinate, n: int) -> list[MachineHit]:
         """N nearest machines, ordered by distance, using the KNN (<->) operator."""

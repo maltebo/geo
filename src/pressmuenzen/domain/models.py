@@ -75,6 +75,22 @@ class CandidateInput:
 
 
 @dataclass(frozen=True, slots=True)
+class MachineTextMatch:
+    """A machine found by a free-text name search, for diagnostics/lookup.
+
+    Unlike :class:`MachineHit` this is intentionally coordinate-agnostic: it
+    surfaces machines that are *missing* from the map (no coordinate, or removed)
+    so an admin can tell why something is not visible. ``on_map`` mirrors exactly
+    the map/spatial filter (has a coordinate and not removed).
+    """
+
+    id: int
+    name: str
+    status: MachineStatus
+    on_map: bool
+
+
+@dataclass(frozen=True, slots=True)
 class MachineHit:
     """A machine returned from a query, with its resolved coordinate.
 

@@ -8,6 +8,7 @@ START = (
     "Funktionen:\n"
     "/suche – Automaten in der Nähe finden\n"
     "/alle_zeigen – Karte mit allen Automaten\n"
+    "/finden <text> – Automaten per Namenssuche finden (z. B. /finden Hamburg Dom)\n"
     "/details <id> – Details zu einem Automaten (z. B. /details 2023)\n"
     "/besucht <id> – Automat als besucht markieren\n"
     "/nicht_besucht <id> – Markierung entfernen\n"
@@ -41,6 +42,13 @@ MAP_ALL_READY = "Karte mit allen Automaten: {url}"
 
 DETAILS_USAGE = "Bitte benutze diese Funktion so:\n/details <id>\nZum Beispiel: /details 1894"
 DETAILS_NOT_FOUND = "Die ID {id} scheint nicht zu existieren ..."
+
+FIND_USAGE = "Bitte gib einen Suchbegriff an, z. B.:\n/finden Hamburg Dom"
+FIND_NONE = "Kein Automat gefunden für „{query}“."
+FIND_HEADER = "Treffer für „{query}“ ({count}):"
+FIND_FLAG_GONE = " – entfernt"
+FIND_FLAG_NO_COORDS = " – nicht auf der Karte (keine Koordinaten)"
+FIND_TRUNCATED = "… (nur die ersten {limit} Treffer; bitte Suchbegriff verfeinern)"
 
 VISITED_USAGE = "Bitte benutze: /besucht <id>\nZum Beispiel: /besucht 1894"
 VISITED_ADDED = "Der Automat {name} wurde zu den besuchten Automaten hinzugefügt."
