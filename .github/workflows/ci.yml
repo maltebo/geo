@@ -28,10 +28,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-      - name: Set up Python
-        run: uv python install 3.12
       - name: Install project + dev deps
-        run: uv pip install --system -e ".[dev]"
+        run: |
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Ruff (lint + format check)
         run: |
           ruff check .
