@@ -1,0 +1,83 @@
+# Lean single-box deployment. `db`, `bot` and `web` run continuously; `scraper`
+# and `migrate` are one-shot services driven by `docker compose run --rm ...`
+# (the scraper from a host systemd timer, migrate from deploy.sh).
+#
+# IMAGE_TAG is supplied by deploy.sh via .env.deploy (pinned to a git SHA).
+# Locally it defaults to a build from the working tree.
+
+x-app-image: &app-image
+  image: ${IMAGE_REPO:-ghcr.io/maltebo/geo}:${IMAGE_TAG:-local}
+  build:
+    context: .
+  env_file:
+    - .env
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pressmuenzen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pressmuenzen}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Bound to the compose network only; never published to the host.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pressmuenzen}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  bot:
+    <<: *app-image
+    command: ["bot"]
+
+  web:
+    <<: *app-image
+    command: ["web"]
+    # Bound to loopback only: reachable by the host health gate and by Caddy
+    # (over the compose network), never published to the public interface.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  # One-shot: `docker compose run --rm migrate` (invoked by deploy.sh before swap).
+  migrate:
+    <<: *app-image
+    command: ["migrate"]
+    restart: "no"
+
+  # One-shot: `docker compose run --rm scraper --mode incremental|full`
+  # (invoked by a host systemd timer).
+  scraper:
+    <<: *app-image
+    entrypoint: ["python", "-m", "pressmuenzen", "scrape"]
+    command: ["--mode", "incremental"]
+    restart: "no"
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN in .env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-}
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

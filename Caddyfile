@@ -1,0 +1,32 @@
+# Caddy reverse proxy with automatic Let's Encrypt TLS.
+# Requires a real domain (TLS-by-IP is not issued by Let's Encrypt).
+# {$PUBLIC_DOMAIN} and {$ADMIN_DOMAIN} are read from the environment (see compose).
+
+# Public read-only map + GeoJSON API + hosted per-search map pages.
+{$PUBLIC_DOMAIN} {
+	encode zstd gzip
+
+	# Health endpoint stays unauthenticated for uptime checks.
+	handle /health {
+		reverse_proxy web:8000
+	}
+
+	# Everything else: public map, /api/machines, /map/{token}.
+	handle {
+		reverse_proxy web:8000
+	}
+}
+
+# Admin / moderation panel on its own host. Defense-in-depth HTTP basic auth
+# in front of the Telegram-login check the app already performs.
+# Generate the hash with:  docker compose run --rm caddy caddy hash-password
+{$ADMIN_DOMAIN} {
+	encode zstd gzip
+
+	basic_auth {
+		# admin <bcrypt-hash> -- replace via `caddy hash-password`.
+		admin {$ADMIN_PASSWORD_HASH}
+	}
+
+	reverse_proxy web:8000
+}

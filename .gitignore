@@ -1,5 +1,25 @@
+# Secrets and runtime state
+/.env
+/.env.deploy
 /private/
 /temp_data/
-/__pycache__/
-/data/__pycache__/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Tooling
 /.idea/
+/.vscode/
+
+# Local data dumps / backups
+*.dump
+*.sql.gz
+
+/plans/

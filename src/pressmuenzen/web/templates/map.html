@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="/static/map.css" />
+</head>
+<body>
+  <div id="legend">
+    <strong>Koordinatenqualität</strong>
+    <div><span class="dot" style="background:green"></span> korrigiert</div>
+    <div><span class="dot" style="background:blue"></span> Forum-GPS</div>
+    <div><span class="dot" style="background:#7eb6ff"></span> Name (geocodiert)</div>
+    <div><span class="dot" style="background:gray"></span> Teilname (ungenau)</div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    const EMBEDDED = {{ embedded_geojson | safe if embedded_geojson else "null" }};
+    const API_URL = {{ ("'" + api_url + "'") | safe if api_url else "null" }};
+    window.PM_CONFIG = { embedded: EMBEDDED, apiUrl: API_URL };
+  </script>
+  <script src="/static/map.js"></script>
+</body>
+</html>
