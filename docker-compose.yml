@@ -1,6 +1,15 @@
-# Lean single-box deployment. `db`, `bot` and `web` run continuously; `scraper`
-# and `migrate` are one-shot services driven by `docker compose run --rm ...`
-# (the scraper from a host systemd timer, migrate from deploy.sh).
+# Lean single-box deployment. `db`, `bot` and `web` run continuously and are the
+# only profile-less services, so `docker compose up -d` (what deploy.sh runs)
+# starts exactly those three.
+#
+# `migrate`/`scraper` (profile "tools") are one-shots run via
+# `docker compose run --rm migrate|scraper ...` (deploy.sh resp. a systemd timer);
+# `run` starts a profiled service without enabling the profile, so a bare `up -d`
+# never triggers them.
+#
+# There is no bundled reverse proxy here: a SYSTEM Caddy on the host
+# (/etc/caddy/Caddyfile) owns 80/443 and reverse-proxies the geo domains to
+# 127.0.0.1:8000. See plans/deployment-runbook.md.
 #
 # IMAGE_TAG is supplied by deploy.sh via .env.deploy (pinned to a git SHA).
 # Locally it defaults to a build from the working tree.
@@ -42,42 +51,28 @@ services:
   web:
     <<: *app-image
     command: ["web"]
-    # Bound to loopback only: reachable by the host health gate and by Caddy
-    # (over the compose network), never published to the public interface.
+    # Bound to loopback only: reachable by the host health gate and by the host
+    # Caddy (127.0.0.1:8000), never published to the public interface.
     ports:
       - "127.0.0.1:8000:8000"
 
   # One-shot: `docker compose run --rm migrate` (invoked by deploy.sh before swap).
+  # Profiled so a bare `up -d` never starts it (deploy.sh runs it explicitly).
   migrate:
     <<: *app-image
     command: ["migrate"]
+    profiles: ["tools"]
     restart: "no"
 
   # One-shot: `docker compose run --rm scraper --mode incremental|full`
-  # (invoked by a host systemd timer).
+  # (invoked by a host systemd timer). Profiled so `up -d` never triggers a
+  # scrape as a side effect of deploying.
   scraper:
     <<: *app-image
     entrypoint: ["python", "-m", "pressmuenzen", "scrape"]
     command: ["--mode", "incremental"]
+    profiles: ["tools"]
     restart: "no"
-
-  caddy:
-    image: caddy:2
-    depends_on:
-      - web
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN in .env}
-      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-}
-    restart: unless-stopped
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:

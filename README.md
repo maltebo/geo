@@ -108,7 +108,7 @@ adduser --system --group --shell /usr/sbin/nologin deploy-geo
 usermod -aG docker deploy-geo
 mkdir -p /srv/geo && chown deploy-geo:deploy-geo /srv/geo
 
-# Copy docker-compose.yml, Caddyfile into /srv/geo and create /srv/geo/.env
+# Copy docker-compose.yml into /srv/geo and create /srv/geo/.env
 # (from .env.example, with real secrets). chmod 600 /srv/geo/.env.
 
 # Install deploy.sh:
