@@ -21,6 +21,7 @@ from pressmuenzen.db.repositories.corrections import ScrapeRunRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.domain.gps_parser import parse_gps_text
 from pressmuenzen.domain.models import Coordinate, GpsSource
+from pressmuenzen.domain.name_geocode import name_geocode_queries
 from pressmuenzen.logging import configure_logging, get_logger
 from pressmuenzen.scraper import canary
 from pressmuenzen.scraper.elongated_coin import ElongatedCoinSource
@@ -192,14 +193,44 @@ async def _derive_coordinates(
     candidates = await repo.list_candidates(machine_id)
     has_forum = any(c.source is GpsSource.FORUM_GPS for c in candidates)
     if not has_forum:
-        coord = await Geocoder(session).geocode(machine.name)
-        if coord is not None:
-            await repo.clear_candidates_of_source(machine_id, GpsSource.FULL_NAME_GEOCODE)
-            await repo.add_candidate(
-                machine_id, GpsSource.FULL_NAME_GEOCODE, coord, raw_text=machine.name
-            )
+        await _geocode_name(repo, session, machine_id, machine.name)
 
     await repo.recompute_geom(machine_id)
+
+
+async def _geocode_name(
+    repo: MachineRepository, session: AsyncSession, machine_id: int, name: str
+) -> None:
+    """Geocode the machine name: full name first, then partial-name fallbacks.
+
+    Port of the legacy ``find_name_gps`` cascade. The full name yields a
+    FULL_NAME_GEOCODE candidate; if it does not resolve, the decoration-stripped
+    variants (e.g. ``Bonn "Bonnshop"`` -> ``Bonn``) yield a PARTIAL_NAME_GEOCODE
+    candidate. Both source tiers are cleared up front so a re-scrape never leaves
+    a stale higher-precedence candidate from a previous run masking the new one.
+    On a geocoder error the enclosing transaction rolls back, so the clear is not
+    persisted -- existing candidates survive a transient Nominatim outage.
+    """
+    await repo.clear_candidates_of_source(machine_id, GpsSource.FULL_NAME_GEOCODE)
+    await repo.clear_candidates_of_source(machine_id, GpsSource.PARTIAL_NAME_GEOCODE)
+
+    geocoder = Geocoder(session)
+    queries = name_geocode_queries(name)
+
+    coord = await geocoder.geocode(queries.full)
+    if coord is not None:
+        await repo.add_candidate(
+            machine_id, GpsSource.FULL_NAME_GEOCODE, coord, raw_text=queries.full
+        )
+        return
+
+    for partial in queries.partials:
+        coord = await geocoder.geocode(partial)
+        if coord is not None:
+            await repo.add_candidate(
+                machine_id, GpsSource.PARTIAL_NAME_GEOCODE, coord, raw_text=partial
+            )
+            return
 
 
 async def _alert_admins(message: str) -> None:
