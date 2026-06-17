@@ -35,8 +35,20 @@ docker compose --env-file .env --env-file .env.deploy run --rm migrate
 docker compose --env-file .env --env-file .env.deploy up -d
 docker image prune -f
 
-# Health gate: roll back to the previous tag if the new web is unhealthy.
-if ! curl -fsS --retry 5 --retry-delay 3 http://127.0.0.1:8000/health; then
+# Health gate: poll until the new web is ready, then roll back if it never is.
+# Docker publishes 127.0.0.1:8000 the instant the container starts, so an early
+# probe is accepted by docker-proxy and reset upstream (curl error 56) before
+# uvicorn binds. `curl --retry` does NOT retry connection-level errors, so we
+# poll in a loop instead -- ~40s budget covers a cold start plus the first DB
+# connection.
+health_ok() { curl -fsS -o /dev/null http://127.0.0.1:8000/health; }
+ready=
+for _ in $(seq 1 20); do
+  if health_ok; then ready=1; break; fi
+  sleep 2
+done
+
+if [ -z "${ready}" ]; then
   echo "health check failed, rolling back to ${PREV_TAG:-none}"
   if [ -n "${PREV_TAG:-}" ]; then
     write_image_tag "${PREV_TAG}"
