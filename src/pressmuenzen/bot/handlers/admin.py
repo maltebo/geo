@@ -6,24 +6,68 @@ from a DB column. Adding an admin = editing one env value and restarting.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from pressmuenzen.bot import texts
-from pressmuenzen.bot.handlers.common import require_args, require_chat_id, require_message
+from pressmuenzen.bot.handlers.common import (
+    correction_diff_map_url,
+    require_args,
+    require_chat_id,
+    require_message,
+)
 from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.corrections import CorrectionRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
-from pressmuenzen.domain.models import MachineStatus
+from pressmuenzen.domain.models import Coordinate, CorrectionType, MachineStatus
 from pressmuenzen.services.corrections import CorrectionService
 from pressmuenzen.services.notifications import notify_admins
 
 
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6_371_000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def _fmt_dist(metres: float) -> str:
+    return f"{round(metres)} m" if metres < 1000 else f"{metres / 1000:.1f} km"
+
+
 def _is_admin(update: Update) -> bool:
     return get_settings().is_admin(require_chat_id(update))
+
+
+def _format_gps_item(
+    correction_id: int,
+    name: str,
+    prop_lat: float,
+    prop_lon: float,
+    mach_lat: float | None,
+    mach_lon: float | None,
+) -> str:
+    proposed = Coordinate(lat=prop_lat, lon=prop_lon)
+    old = Coordinate(lat=mach_lat, lon=mach_lon) if mach_lat is not None else None
+    map_url = correction_diff_map_url(old, proposed, name)
+    if old is not None:
+        return texts.QUEUE_ITEM_GPS.format(
+            id=correction_id,
+            name=name,
+            old_url=old.maps_link,
+            new_url=proposed.maps_link,
+            distance=_fmt_dist(_haversine_m(mach_lat, mach_lon, prop_lat, prop_lon)),
+            map_url=map_url,
+        )
+    return texts.QUEUE_ITEM_GPS_NO_OLD.format(
+        id=correction_id, name=name, new_url=proposed.maps_link, map_url=map_url
+    )
 
 
 async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -32,16 +76,21 @@ async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await message.reply_text(texts.ADMIN_ONLY)
         return
     async with session_scope() as session:
-        pending = await CorrectionRepository(session).pending()
-        machine_repo = MachineRepository(session)
+        pending = await CorrectionRepository(session).pending_with_coords()
         if not pending:
             await message.reply_text(texts.QUEUE_EMPTY)
             return
         lines = [texts.QUEUE_HEADER]
-        for c in pending:
-            machine = await machine_repo.get(c.machine_id)
-            name = machine.name if machine else f"#{c.machine_id}"
-            lines.append(f"#{c.id} [{c.type}] {name}: {c.comment or ''}")
+        for c, machine_name, prop_lat, prop_lon, mach_lat, mach_lon in pending:
+            name = machine_name or f"#{c.machine_id}"
+            if c.type == CorrectionType.GPS and prop_lat is not None:
+                lines.append(_format_gps_item(c.id, name, prop_lat, prop_lon, mach_lat, mach_lon))
+            else:
+                lines.append(
+                    texts.QUEUE_ITEM.format(
+                        id=c.id, type=c.type, name=name, comment=c.comment or ""
+                    )
+                )
         lines.append("\nAnnehmen: /ok <id>   Ablehnen: /nope <id>")
     await message.reply_text("\n".join(lines))
 

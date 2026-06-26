@@ -72,7 +72,7 @@ UNMUTED = "Benachrichtigungen sind wieder aktiv."
 NOTIFY_NEW_MACHINE = "Neuer Automat in deiner Nähe ({distance} km): {name}\n{url}"
 
 REPORT_DEEPLINK_INVALID = "Dieser Link ist ungültig oder abgelaufen."
-REPORT_DEEPLINK_THANKS = 'Danke! Deine Korrektur fuer "{name}" wurde an die Moderation weitergeleitet.'
+REPORT_DEEPLINK_THANKS = 'Danke! Deine Korrektur für "{name}" wurde an die Moderation weitergeleitet.'
 
 REPORT_USAGE = "Bitte benutze: /melden <id>\nZum Beispiel: /melden 1894"
 REPORT_START = (
@@ -89,6 +89,19 @@ REPORT_THANKS = "Danke! Deine Meldung wurde an die Moderation weitergeleitet."
 ADMIN_ONLY = "Diese Funktion ist nur für Admins."
 QUEUE_EMPTY = "Die Moderations-Warteschlange ist leer."
 QUEUE_HEADER = "Offene Meldungen:"
+QUEUE_ITEM = "#{id} [{type}] {name}: {comment}"
+QUEUE_ITEM_GPS = (
+    "#{id} [gps] {name}\n"
+    "  Alt: {old_url}\n"
+    "  Neu: {new_url}\n"
+    "  Verschiebung: {distance}\n"
+    "  Karte: {map_url}"
+)
+QUEUE_ITEM_GPS_NO_OLD = (
+    "#{id} [gps] {name} (kein bisheriger Standort)\n"
+    "  Neu: {new_url}\n"
+    "  Karte: {map_url}"
+)
 OK_USAGE = "Bitte benutze: /ok <correction_id>"
 NOPE_USAGE = "Bitte benutze: /nope <correction_id>"
 CORRECTION_APPROVED = "Meldung {id} wurde angenommen."

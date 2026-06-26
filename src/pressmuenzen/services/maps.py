@@ -88,6 +88,30 @@ def make_map_token(origin: Coordinate, mode: str, value: float, *, now: float | 
     return f"{body.decode()}.{sig.decode()}"
 
 
+def make_diff_map_token(
+    old: Coordinate | None,
+    new: Coordinate,
+    name: str,
+    *,
+    now: float | None = None,
+) -> str:
+    """Sign a token for a correction diff map (old vs. new position)."""
+    payload: dict[str, Any] = {
+        "mode": "diff",
+        "new_lat": round(new.lat, 6),
+        "new_lon": round(new.lon, 6),
+        "name": name,
+        "exp": int((now or time.time()) + _TOKEN_TTL_SECONDS),
+    }
+    if old is not None:
+        payload["old_lat"] = round(old.lat, 6)
+        payload["old_lon"] = round(old.lon, 6)
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    body = base64.urlsafe_b64encode(raw).rstrip(b"=")
+    sig = base64.urlsafe_b64encode(_sign(body)).rstrip(b"=")
+    return f"{body.decode()}.{sig.decode()}"
+
+
 def parse_map_token(token: str, *, now: float | None = None) -> dict[str, Any] | None:
     try:
         body_str, sig_str = token.split(".", 1)

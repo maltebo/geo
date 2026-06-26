@@ -39,8 +39,27 @@ async def hosted_map(request: Request, token: str) -> HTMLResponse:
     if payload is None:
         return HTMLResponse("Link ungültig oder abgelaufen.", status_code=404)
 
-    origin = Coordinate(lat=payload["lat"], lon=payload["lon"])
     mode = payload["mode"]
+
+    if mode == "diff":
+        old_point = (
+            json.dumps({"lat": payload["old_lat"], "lon": payload["old_lon"]})
+            if "old_lat" in payload
+            else "null"
+        )
+        new_point = json.dumps({"lat": payload["new_lat"], "lon": payload["new_lon"]})
+        return templates.TemplateResponse(
+            request,
+            "diff_map.html",
+            {
+                "title": f"Positionskorrektur – {payload['name']}",
+                "machine_name": payload["name"],
+                "old_point": old_point,
+                "new_point": new_point,
+            },
+        )
+
+    origin = Coordinate(lat=payload["lat"], lon=payload["lon"])
     value = payload["value"]
 
     async with session_scope() as session:

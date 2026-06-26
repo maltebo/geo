@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title | e }}</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/map.css" />
+</head>
+<body>
+  <div id="legend">
+    <strong>{{ machine_name | e }}</strong>
+    <div><span class="dot" style="background:#e67e00"></span> Alter Standort</div>
+    <div><span class="dot" style="background:green"></span> Neuer Standort</div>
+  </div>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const OLD = {{ old_point | safe }};
+    const NEW = {{ new_point | safe }};
+
+    const map = L.map("map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap-Mitwirkende"
+    }).addTo(map);
+
+    function dot(color) {
+      const d = 24;
+      return L.divIcon({
+        className: "",
+        html: '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;' +
+              'border:3px solid #fff;box-shadow:0 0 4px 1px rgba(0,0,0,.6);' +
+              'background:' + color + '"></div>',
+        iconSize: [d, d],
+        iconAnchor: [d / 2, d / 2]
+      });
+    }
+
+    const bounds = [];
+
+    if (OLD) {
+      L.marker([OLD.lat, OLD.lon], { icon: dot("#e67e00") })
+        .bindPopup("<b>Alter Standort</b><br>" + OLD.lat.toFixed(5) + ", " + OLD.lon.toFixed(5))
+        .addTo(map);
+      bounds.push([OLD.lat, OLD.lon]);
+    }
+
+    L.marker([NEW.lat, NEW.lon], { icon: dot("green") })
+      .bindPopup("<b>Neuer Standort</b><br>" + NEW.lat.toFixed(5) + ", " + NEW.lon.toFixed(5))
+      .addTo(map);
+    bounds.push([NEW.lat, NEW.lon]);
+
+    if (OLD) {
+      L.polyline([[OLD.lat, OLD.lon], [NEW.lat, NEW.lon]], {
+        color: "#555",
+        dashArray: "6 4",
+        weight: 2,
+        opacity: 0.7
+      }).addTo(map);
+    }
+
+    map.fitBounds(bounds, { padding: [60, 60] });
+  </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 from pressmuenzen.bot import texts
 from pressmuenzen.config import get_settings
 from pressmuenzen.domain.models import Coordinate, MachineHit, MachineStatus, MachineTextMatch
-from pressmuenzen.services.maps import make_map_token
+from pressmuenzen.services.maps import make_diff_map_token, make_map_token
 
 # Max rows a /finden text search returns. Shared so the repo query and the
 # "result truncated" hint in the formatter can never drift apart.
@@ -50,6 +50,11 @@ def require_user_data(context: ContextTypes.DEFAULT_TYPE) -> dict[Any, Any]:
 
 def hosted_map_url(origin: Coordinate, mode: str, value: float) -> str:
     token = make_map_token(origin, mode, value)
+    return f"{get_settings().public_base_url_clean}/map/{token}"
+
+
+def correction_diff_map_url(old: Coordinate | None, new: Coordinate, name: str) -> str:
+    token = make_diff_map_token(old, new, name)
     return f"{get_settings().public_base_url_clean}/map/{token}"
 
 

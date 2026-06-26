@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pressmuenzen.db.geo import point_wkt
-from pressmuenzen.db.models import Correction, ScrapeRun
+from pressmuenzen.db.geo import lat_expr, lon_expr, point_wkt
+from pressmuenzen.db.models import Correction, Machine, ScrapeRun
 from pressmuenzen.domain.models import (
     Coordinate,
     CorrectionStatus,
@@ -47,6 +47,25 @@ class CorrectionRepository:
             .order_by(Correction.created_at)
         )
         return list(rows.scalars().all())
+
+    async def pending_with_coords(
+        self,
+    ) -> list[tuple[Correction, str, float | None, float | None, float | None, float | None]]:
+        """(correction, machine_name, proposed_lat, proposed_lon, machine_lat, machine_lon)"""
+        rows = await self.session.execute(
+            select(
+                Correction,
+                Machine.name,
+                lat_expr(Correction.proposed_geom),
+                lon_expr(Correction.proposed_geom),
+                lat_expr(Machine.geom),
+                lon_expr(Machine.geom),
+            )
+            .join(Machine, Correction.machine_id == Machine.id)
+            .where(Correction.status == CorrectionStatus.PENDING)
+            .order_by(Correction.created_at)
+        )
+        return list(rows.all())
 
     async def set_status(
         self, correction_id: int, status: CorrectionStatus, reviewer_chat_id: int
