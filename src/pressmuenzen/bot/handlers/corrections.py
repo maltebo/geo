@@ -1,4 +1,4 @@
-"""Crowdsourced corrections: /melden conversation."""
+"""Crowdsourced corrections: /melden conversation and map deep-link flow."""
 
 from __future__ import annotations
 
@@ -19,6 +19,38 @@ from pressmuenzen.db.repositories.users import UserRepository
 from pressmuenzen.domain.models import Coordinate, CorrectionType
 
 REPORT_WAIT = 0
+
+
+def parse_fix_payload(payload: str) -> tuple[int, float, float] | None:
+    """Parse a map deep-link payload of the form fix_<id>_<lat6>_<lon6>.
+
+    lat6/lon6 are lat/lon multiplied by 1e6 and rounded to integers. Negative
+    values are encoded with an "n" prefix (e.g. n9876543 == -9.876543).
+    Returns (machine_id, lat, lon) or None if the payload is malformed.
+    """
+    if not payload.startswith("fix_"):
+        return None
+    parts = payload[4:].split("_")
+    if len(parts) != 3:
+        return None
+    machine_id_str, lat_str, lon_str = parts
+    if not machine_id_str.isdigit():
+        return None
+    try:
+        machine_id = int(machine_id_str)
+        lat = _decode_coord(lat_str)
+        lon = _decode_coord(lon_str)
+    except (ValueError, IndexError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return machine_id, lat, lon
+
+
+def _decode_coord(s: str) -> float:
+    if s.startswith("n"):
+        return -int(s[1:]) / 1_000_000
+    return int(s) / 1_000_000
 
 _KEYWORD_TO_TYPE = {
     "weg": CorrectionType.GONE,
@@ -65,6 +97,39 @@ async def report_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     type_ = _KEYWORD_TO_TYPE.get(raw.strip().lower(), CorrectionType.OTHER)
     await _store_correction(update, context, type_=type_, proposed=None, comment=raw)
     return ConversationHandler.END
+
+
+async def handle_deeplink_correction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Store a GPS correction that arrived via a map deep-link (/start fix_...).
+
+    The user picked a point on the Leaflet map and confirmed it; the coordinates
+    are already baked into the start payload so no further conversation is needed.
+    """
+    message = require_message(update)
+    args = require_args(context)
+    parsed = parse_fix_payload(args[0]) if args else None
+    if parsed is None:
+        await message.reply_text(texts.REPORT_DEEPLINK_INVALID)
+        return
+
+    machine_id, lat, lon = parsed
+    chat_id = require_chat_id(update)
+
+    async with session_scope() as session:
+        machine = await MachineRepository(session).get(machine_id)
+        if machine is None:
+            await message.reply_text(texts.DETAILS_NOT_FOUND.format(id=machine_id))
+            return
+        user = await UserRepository(session).get_or_create(chat_id)
+        await CorrectionRepository(session).create(
+            machine_id=machine_id,
+            user_id=user.id,
+            type_=CorrectionType.GPS,
+            comment="Korrigierte Position per Karten-Klick",
+            proposed=Coordinate(lat=lat, lon=lon),
+        )
+
+    await message.reply_text(texts.REPORT_DEEPLINK_THANKS.format(name=machine.name))
 
 
 async def _store_correction(

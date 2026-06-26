@@ -21,3 +21,80 @@ html, body { height: 100%; margin: 0; }
 }
 .popup-title { font-weight: bold; font-size: 14px; }
 .popup-warn { color: #b00; font-style: italic; }
+.popup-correct { margin-top: 6px; }
+.popup-correct a { font-size: 12px; color: #0066cc; }
+
+/* Pick-mode: crosshair cursor on the map */
+#map.picking { cursor: crosshair; }
+
+/* Hint bar shown while user picks a point */
+#pick-hint {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  background: rgba(30, 30, 30, 0.88);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font: 14px/1.4 system-ui, sans-serif;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+#pick-hint button {
+  margin-left: 10px;
+  padding: 3px 10px;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* Overlay asking user to open the link in Telegram */
+#confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#confirm-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px 24px;
+  max-width: 320px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  font: 14px/1.5 system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#confirm-title { font-weight: bold; font-size: 15px; }
+#confirm-coords { color: #555; font-size: 13px; font-family: monospace; }
+#confirm-link {
+  display: block;
+  text-align: center;
+  background: #0088cc;
+  color: #fff;
+  border-radius: 6px;
+  padding: 9px 0;
+  text-decoration: none;
+  font-weight: 600;
+}
+#confirm-link:hover { background: #006aaa; }
+#confirm-cancel {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 7px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+#confirm-cancel:hover { background: #f5f5f5; }
