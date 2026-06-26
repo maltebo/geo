@@ -71,6 +71,9 @@ MUTED = "Benachrichtigungen sind jetzt stummgeschaltet. /stumm hebt das wieder a
 UNMUTED = "Benachrichtigungen sind wieder aktiv."
 NOTIFY_NEW_MACHINE = "Neuer Automat in deiner Nähe ({distance} km): {name}\n{url}"
 
+REPORT_DEEPLINK_INVALID = "Dieser Link ist ungültig oder abgelaufen."
+REPORT_DEEPLINK_THANKS = 'Danke! Deine Korrektur fuer "{name}" wurde an die Moderation weitergeleitet.'
+
 REPORT_USAGE = "Bitte benutze: /melden <id>\nZum Beispiel: /melden 1894"
 REPORT_START = (
     "Was möchtest du zu „{name}“ melden?\n"

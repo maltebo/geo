@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # Kept as a raw string: pydantic-settings would otherwise try to JSON-decode
     # a tuple/list-typed env value. Parsed into ints via the admin_chat_ids property.
     admin_chat_ids_raw: str = Field(default="", alias="ADMIN_CHAT_IDS")
+    # Bot username without @, e.g. "PressmünzenBot". Used to build t.me deep-links on the map.
+    telegram_bot_username: str = Field(default="", alias="TELEGRAM_BOT_USERNAME")
 
     # Database
     database_url: str = Field(

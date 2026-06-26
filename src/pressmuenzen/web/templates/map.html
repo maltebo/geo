@@ -24,7 +24,8 @@
   <script>
     const EMBEDDED = {{ embedded_geojson | safe if embedded_geojson else "null" }};
     const API_URL = {{ ("'" + api_url + "'") | safe if api_url else "null" }};
-    window.PM_CONFIG = { embedded: EMBEDDED, apiUrl: API_URL };
+    const BOT_USERNAME = {{ ("'" + bot_username + "'") | safe if bot_username else "null" }};
+    window.PM_CONFIG = { embedded: EMBEDDED, apiUrl: API_URL, botUsername: BOT_USERNAME };
   </script>
   <script src="/static/map.js"></script>
 </body>

@@ -16,12 +16,17 @@ from pressmuenzen.bot.handlers.common import (
     require_chat_id,
     require_message,
 )
+from pressmuenzen.bot.handlers.corrections import handle_deeplink_correction, parse_fix_payload
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.domain.models import Coordinate
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    args = require_args(context)
+    if args and parse_fix_payload(args[0]) is not None:
+        await handle_deeplink_correction(update, context)
+        return
     await require_message(update).reply_text(texts.START)
 
 

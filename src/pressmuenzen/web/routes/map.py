@@ -7,6 +7,7 @@ import json
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.domain.models import Coordinate
@@ -27,6 +28,7 @@ async def public_map(request: Request) -> HTMLResponse:
             "title": "Pressmünzen-Karte",
             "embedded_geojson": None,
             "api_url": "/api/machines",
+            "bot_username": get_settings().telegram_bot_username,
         },
     )
 
@@ -61,5 +63,6 @@ async def hosted_map(request: Request, token: str) -> HTMLResponse:
             "title": "Pressmünzen – Suchergebnis",
             "embedded_geojson": json.dumps(geojson),
             "api_url": None,
+            "bot_username": get_settings().telegram_bot_username,
         },
     )
