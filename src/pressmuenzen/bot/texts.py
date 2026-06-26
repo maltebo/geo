@@ -72,7 +72,9 @@ UNMUTED = "Benachrichtigungen sind wieder aktiv."
 NOTIFY_NEW_MACHINE = "Neuer Automat in deiner Nähe ({distance} km): {name}\n{url}"
 
 REPORT_DEEPLINK_INVALID = "Dieser Link ist ungültig oder abgelaufen."
-REPORT_DEEPLINK_THANKS = 'Danke! Deine Korrektur für "{name}" wurde an die Moderation weitergeleitet.'
+REPORT_DEEPLINK_THANKS = (
+    'Danke! Deine Korrektur für "{name}" wurde an die Moderation weitergeleitet.'
+)
 
 REPORT_USAGE = "Bitte benutze: /melden <id>\nZum Beispiel: /melden 1894"
 REPORT_START = (
@@ -98,9 +100,7 @@ QUEUE_ITEM_GPS = (
     "  Karte: {map_url}"
 )
 QUEUE_ITEM_GPS_NO_OLD = (
-    "#{id} [gps] {name} (kein bisheriger Standort)\n"
-    "  Neu: {new_url}\n"
-    "  Karte: {map_url}"
+    "#{id} [gps] {name} (kein bisheriger Standort)\n  Neu: {new_url}\n  Karte: {map_url}"
 )
 OK_USAGE = "Bitte benutze: /ok <correction_id>"
 NOPE_USAGE = "Bitte benutze: /nope <correction_id>"

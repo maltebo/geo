@@ -52,6 +52,7 @@ def _decode_coord(s: str) -> float:
         return -int(s[1:]) / 1_000_000
     return int(s) / 1_000_000
 
+
 _KEYWORD_TO_TYPE = {
     "weg": CorrectionType.GONE,
     "umgezogen": CorrectionType.MOVED,
