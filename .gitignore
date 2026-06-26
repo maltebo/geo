@@ -26,3 +26,5 @@ venv/
 *.local.sh
 
 /plans/
+.env.dev
+docker-compose.override.yml
