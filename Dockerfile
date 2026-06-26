@@ -11,12 +11,18 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Dependency layer (cached unless pyproject changes).
+# Dependency layer — only re-runs when pyproject.toml/README.md changes.
+# A stub package satisfies hatchling so the full dep graph is resolved and
+# downloaded here, before the real source is ever copied in.
 COPY pyproject.toml README.md ./
-COPY src ./src
-RUN uv pip install --system --no-cache .
+RUN mkdir -p src/pressmuenzen && touch src/pressmuenzen/__init__.py && \
+    uv pip install --system --no-cache .
 
-# Application code + migrations.
+# Application code — fast reinstall, no network (deps already present above).
+COPY src ./src
+RUN uv pip install --system --no-cache --no-deps --reinstall .
+
+# Migrations + helper scripts.
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY scripts ./scripts
