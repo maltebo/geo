@@ -22,4 +22,7 @@ venv/
 *.dump
 *.sql.gz
 
+# Local operator scripts (carry host/access details)
+*.local.sh
+
 /plans/

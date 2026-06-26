@@ -28,6 +28,30 @@ write_image_tag "${TAG}"
 # the files itself via the --env-file flags below (for ${...} interpolation) and
 # injects container env via `env_file:` -- neither needs shell sourcing.
 
+# Read a single dotenv value without sourcing the file. Safe here because the
+# keys we use (TELEGRAM_TOKEN, ADMIN_CHAT_IDS) hold no spaces or shell metachars.
+dotenv_get() { grep -oE "^$1=.*" .env 2>/dev/null | head -n1 | cut -d= -f2-; }
+
+# Best-effort Telegram alert to every admin chat. Never fails the deploy: the
+# deploy outcome is already decided by the time we notify. Runs in the deploy
+# layer (not via the app) so it stays usable even when the new container is broken.
+notify_admins() {
+  local msg="$1" token ids id
+  token="$(dotenv_get TELEGRAM_TOKEN)"
+  ids="$(dotenv_get ADMIN_CHAT_IDS)"
+  [ -n "${token}" ] && [ -n "${ids}" ] || { echo "notify skipped: token or ADMIN_CHAT_IDS missing"; return 0; }
+  IFS=',' read -ra id <<< "${ids}"
+  for chat in "${id[@]}"; do
+    chat="$(printf '%s' "${chat}" | tr -d '[:space:]')"
+    [ -n "${chat}" ] || continue
+    curl -fsS -o /dev/null --max-time 10 \
+      "https://api.telegram.org/bot${token}/sendMessage" \
+      --data-urlencode "chat_id=${chat}" \
+      --data-urlencode "text=[Pressmuenzen] ${msg}" \
+      || echo "notify failed for chat ${chat}"
+  done
+}
+
 # GHCR image is public; pulls are anonymous, no docker login required.
 docker compose --env-file .env --env-file .env.deploy pull
 # Migrate BEFORE swapping running services.
@@ -54,7 +78,10 @@ if [ -z "${ready}" ]; then
     write_image_tag "${PREV_TAG}"
     docker compose --env-file .env --env-file .env.deploy up -d
   fi
+  prev_short="${PREV_TAG:0:7}"
+  notify_admins "Deploy FEHLGESCHLAGEN fuer ${TAG:0:7}; Rollback auf ${prev_short:-none}. Health-Check nicht bestanden."
   exit 1
 fi
 
 echo "deploy ok: ${TAG}"
+notify_admins "Deploy erfolgreich: ${TAG:0:7}"
