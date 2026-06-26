@@ -54,7 +54,11 @@ def _format_gps_item(
     mach_lon: float | None,
 ) -> str:
     proposed = Coordinate(lat=prop_lat, lon=prop_lon)
-    old = Coordinate(lat=mach_lat, lon=mach_lon) if mach_lat is not None and mach_lon is not None else None
+    old = (
+        Coordinate(lat=mach_lat, lon=mach_lon)
+        if mach_lat is not None and mach_lon is not None
+        else None
+    )
     map_url = correction_diff_map_url(old, proposed, name)
     if old is not None:
         return texts.QUEUE_ITEM_GPS.format(
