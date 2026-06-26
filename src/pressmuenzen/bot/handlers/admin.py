@@ -54,7 +54,7 @@ def _format_gps_item(
     mach_lon: float | None,
 ) -> str:
     proposed = Coordinate(lat=prop_lat, lon=prop_lon)
-    old = Coordinate(lat=mach_lat, lon=mach_lon) if mach_lat is not None else None
+    old = Coordinate(lat=mach_lat, lon=mach_lon) if mach_lat is not None and mach_lon is not None else None
     map_url = correction_diff_map_url(old, proposed, name)
     if old is not None:
         return texts.QUEUE_ITEM_GPS.format(
@@ -62,7 +62,7 @@ def _format_gps_item(
             name=name,
             old_url=old.maps_link,
             new_url=proposed.maps_link,
-            distance=_fmt_dist(_haversine_m(mach_lat, mach_lon, prop_lat, prop_lon)),
+            distance=_fmt_dist(_haversine_m(old.lat, old.lon, prop_lat, prop_lon)),
             map_url=map_url,
         )
     return texts.QUEUE_ITEM_GPS_NO_OLD.format(
@@ -83,7 +83,7 @@ async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines = [texts.QUEUE_HEADER]
         for c, machine_name, prop_lat, prop_lon, mach_lat, mach_lon in pending:
             name = machine_name or f"#{c.machine_id}"
-            if c.type == CorrectionType.GPS and prop_lat is not None:
+            if c.type == CorrectionType.GPS and prop_lat is not None and prop_lon is not None:
                 lines.append(_format_gps_item(c.id, name, prop_lat, prop_lon, mach_lat, mach_lon))
             else:
                 lines.append(

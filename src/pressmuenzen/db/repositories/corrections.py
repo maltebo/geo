@@ -65,7 +65,7 @@ class CorrectionRepository:
             .where(Correction.status == CorrectionStatus.PENDING)
             .order_by(Correction.created_at)
         )
-        return list(rows.all())
+        return list(rows.all())  # type: ignore[arg-type]
 
     async def set_status(
         self, correction_id: int, status: CorrectionStatus, reviewer_chat_id: int
