@@ -24,6 +24,7 @@ dependencies = [
     "tenacity>=8.4",
     "aiolimiter>=1.1",
     "jinja2>=3.1",
+    "google-generativeai>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -72,6 +73,10 @@ disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = ["geopy.*", "folium.*", "geoalchemy2.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

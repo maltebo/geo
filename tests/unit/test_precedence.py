@@ -48,10 +48,23 @@ def test_none_candidates_are_ignored() -> None:
     assert coord == C
 
 
+def test_ai_address_beats_full_name_geocode() -> None:
+    _, source = resolve(
+        [_cand(GpsSource.FULL_NAME_GEOCODE), _cand(GpsSource.AI_ADDRESS_GEOCODE, C2)]
+    )
+    assert source is GpsSource.AI_ADDRESS_GEOCODE
+
+
+def test_forum_gps_beats_ai_address() -> None:
+    _, source = resolve([_cand(GpsSource.AI_ADDRESS_GEOCODE), _cand(GpsSource.FORUM_GPS, C2)])
+    assert source is GpsSource.FORUM_GPS
+
+
 def test_precedence_order_is_the_documented_contract() -> None:
     order = [
         GpsSource.CORRECTED,
         GpsSource.FORUM_GPS,
+        GpsSource.AI_ADDRESS_GEOCODE,
         GpsSource.FULL_NAME_GEOCODE,
         GpsSource.PARTIAL_NAME_GEOCODE,
     ]

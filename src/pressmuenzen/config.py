@@ -60,6 +60,14 @@ class Settings(BaseSettings):
         default=0.85, alias="SCRAPER_CANARY_MIN_PARSE_RATE"
     )
 
+    # AI extraction
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-1.5-flash", alias="GEMINI_MODEL")
+    # Number of LLM calls (not rows picked) per nightly run.
+    ai_extract_nightly_budget: int = Field(default=30, alias="AI_EXTRACT_NIGHTLY_BUDGET")
+    # Minimum confidence level to create an AI_ADDRESS_GEOCODE candidate ("medium" or "high").
+    ai_extract_min_confidence: str = Field(default="medium", alias="AI_EXTRACT_MIN_CONFIDENCE")
+
     # Moderation
     # A machine the scraper has not re-seen for this many days is surfaced by the
     # admin /stale command for human review. Nothing is auto-deleted: forum threads

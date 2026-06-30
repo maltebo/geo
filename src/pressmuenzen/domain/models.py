@@ -11,11 +11,12 @@ class GpsSource(enum.StrEnum):
 
     The numeric ``precedence`` (lower = more trusted) is the contract used by
     :mod:`pressmuenzen.domain.precedence`. Preserving these exact tiers keeps the
-    legacy precedence behaviour (``corrected > gps > full_name > partial_name``).
+    legacy precedence behaviour (``corrected > forum_gps > ai_address > full_name > partial_name``).
     """
 
     CORRECTED = "corrected"
     FORUM_GPS = "forum_gps"
+    AI_ADDRESS_GEOCODE = "ai_address_geocode"
     FULL_NAME_GEOCODE = "full_name_geocode"
     PARTIAL_NAME_GEOCODE = "partial_name_geocode"
     NONE = "none"
@@ -28,8 +29,9 @@ class GpsSource(enum.StrEnum):
 _PRECEDENCE: dict[GpsSource, int] = {
     GpsSource.CORRECTED: 0,
     GpsSource.FORUM_GPS: 1,
-    GpsSource.FULL_NAME_GEOCODE: 2,
-    GpsSource.PARTIAL_NAME_GEOCODE: 3,
+    GpsSource.AI_ADDRESS_GEOCODE: 2,
+    GpsSource.FULL_NAME_GEOCODE: 3,
+    GpsSource.PARTIAL_NAME_GEOCODE: 4,
     GpsSource.NONE: 99,
 }
 

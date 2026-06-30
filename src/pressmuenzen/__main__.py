@@ -3,6 +3,7 @@
 python -m pressmuenzen bot
 python -m pressmuenzen web
 python -m pressmuenzen scrape [--mode incremental|full]
+python -m pressmuenzen ai-extract [--budget N]
 python -m pressmuenzen migrate
 """
 
@@ -53,12 +54,28 @@ def _run_scrape(argv: list[str]) -> None:
     asyncio.run(run_scrape(mode=args.mode))
 
 
+def _run_ai_extract(argv: list[str]) -> None:
+    import asyncio
+
+    from pressmuenzen.ai.job import run_ai_extract
+
+    parser = argparse.ArgumentParser(prog="pressmuenzen ai-extract")
+    parser.add_argument(
+        "--budget",
+        type=int,
+        default=None,
+        help="Max LLM calls to make (default: AI_EXTRACT_NIGHTLY_BUDGET env var or 30)",
+    )
+    args = parser.parse_args(argv)
+    asyncio.run(run_ai_extract(budget=args.budget))
+
+
 def main() -> None:
     configure_logging()
     log = get_logger("pressmuenzen")
 
     if len(sys.argv) < 2:
-        print("usage: pressmuenzen {bot|web|scrape|migrate}", file=sys.stderr)
+        print("usage: pressmuenzen {bot|web|scrape|ai-extract|migrate}", file=sys.stderr)
         raise SystemExit(2)
 
     role, rest = sys.argv[1], sys.argv[2:]
@@ -71,6 +88,8 @@ def main() -> None:
             _run_web()
         case "scrape":
             _run_scrape(rest)
+        case "ai-extract":
+            _run_ai_extract(rest)
         case "migrate":
             _run_migrate()
         case _:
