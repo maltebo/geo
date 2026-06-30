@@ -241,3 +241,13 @@ class MachineRepository:
                 CoordinateCandidate.source == source,
             )
         )
+
+    async def ungeocoded(self, limit: int) -> list[Machine]:
+        """Return up to ``limit`` active machines with no geometry, in random order."""
+        rows = await self.session.execute(
+            select(Machine)
+            .where(Machine.geom.is_(None), Machine.status == MachineStatus.ACTIVE)
+            .order_by(func.random())
+            .limit(limit)
+        )
+        return list(rows.scalars().all())

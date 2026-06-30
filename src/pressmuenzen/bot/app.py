@@ -15,7 +15,15 @@ from telegram.ext import (
     filters,
 )
 
-from pressmuenzen.bot.handlers import admin, corrections, details, search, visited, watches
+from pressmuenzen.bot.handlers import (
+    admin,
+    admin_geocode,
+    corrections,
+    details,
+    search,
+    visited,
+    watches,
+)
 from pressmuenzen.config import get_settings
 from pressmuenzen.logging import configure_logging, get_logger
 
@@ -102,6 +110,25 @@ def build_application() -> _Application:
                 corrections.REPORT_WAIT: [
                     MessageHandler(filters.LOCATION, corrections.report_pin),
                     MessageHandler(filters.TEXT & ~filters.COMMAND, corrections.report_text),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", search.cancel)],
+        )
+    )
+
+    # /geocodieren conversation (admin-only: manually geocode unresolved machines).
+    app.add_handler(
+        ConversationHandler(
+            entry_points=[CommandHandler("geocodieren", admin_geocode.geocode_start)],
+            states={
+                admin_geocode.GEOCODE_PICK: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_geocode.geocode_pick)
+                ],
+                admin_geocode.GEOCODE_ADDRESS: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_geocode.geocode_address)
+                ],
+                admin_geocode.GEOCODE_CONFIRM: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_geocode.geocode_confirm)
                 ],
             },
             fallbacks=[CommandHandler("cancel", search.cancel)],

@@ -126,3 +126,23 @@ STALE_FOOTER = (
 REMOVE_USAGE = "Bitte benutze: /entfernen <id>\nZum Beispiel: /entfernen 1894"
 REMOVE_DONE = "Standort #{id} ({name}) wurde entfernt."
 REMOVE_ALREADY_GONE = "Standort #{id} ist bereits entfernt."
+
+# Manual geocoding (/geocodieren)
+GEOCODE_NONE = "Alle aktiven Standorte haben bereits Koordinaten - nichts zu tun!"
+GEOCODE_LIST_HEADER = "Nicht geocodierte Standorte (zufällige Auswahl):"
+GEOCODE_LIST_ITEM = "#{id} {name}\n{url}"
+GEOCODE_LIST_FOOTER = "\nBitte sende die ID des Standorts, den du geocodieren möchtest."
+GEOCODE_INVALID_ID = (
+    "Ungültige ID oder Standort hat bereits Koordinaten. Bitte eine der angezeigten IDs senden."
+)
+GEOCODE_DETAILS = (
+    "Standort: {name}\n"
+    "Forum: {url}\n\n"
+    "Beschreibung:\n{description}\n\n"
+    "Bitte sende eine Adresse zum Geocodieren (oder /cancel zum Abbrechen)."
+)
+GEOCODE_TRYING = "Okay, ich suche diese Adresse ..."
+GEOCODE_NOT_FOUND = "Diese Adresse wurde nicht gefunden. Bitte eine andere Adresse versuchen."
+GEOCODE_RESULT = "Koordinaten gefunden: {maps_link}\n\nKoordinaten übernehmen? (ja / nein)"
+GEOCODE_APPLIED = 'Koordinaten für "{name}" gesetzt.'
+GEOCODE_ABORTED = "Abgebrochen. Keine Änderungen vorgenommen."

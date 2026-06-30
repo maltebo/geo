@@ -113,3 +113,35 @@ async def test_search_by_name_respects_limit(db_session) -> None:  # type: ignor
         db_session.add(Machine(id=4000 + i, source_url=f"u400{i}", name=f"Kiosk {i}"))
     await db_session.flush()
     assert len(await repo.search_by_name("kiosk", limit=3)) == 3
+
+
+async def test_ungeocoded_excludes_geocoded_and_gone(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = MachineRepository(db_session)
+    # Active, no coords -> should appear
+    db_session.add(Machine(id=5000, source_url="u5000", name="No Coord"))
+    db_session.add(Machine(id=5001, source_url="u5001", name="Also No Coord"))
+    await db_session.flush()
+    # Active, with coords -> must not appear
+    await repo.add_candidate(5000, GpsSource.FORUM_GPS, KOELN)
+    await repo.recompute_geom(5000)
+    # Gone, no coords -> must not appear
+    db_session.add(Machine(id=5002, source_url="u5002", name="Gone No Coord"))
+    await db_session.flush()
+    await repo.mark_gone(5002)
+
+    results = await repo.ungeocoded(10)
+    ids = {m.id for m in results}
+
+    assert 5001 in ids  # active + no geom
+    assert 5000 not in ids  # has geom
+    assert 5002 not in ids  # gone
+
+
+async def test_ungeocoded_respects_limit(db_session) -> None:  # type: ignore[no-untyped-def]
+    repo = MachineRepository(db_session)
+    for i in range(5):
+        db_session.add(Machine(id=6000 + i, source_url=f"u600{i}", name=f"U{i}"))
+    await db_session.flush()
+
+    results = await repo.ungeocoded(3)
+    assert len(results) == 3
