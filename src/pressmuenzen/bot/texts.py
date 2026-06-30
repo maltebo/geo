@@ -2,22 +2,38 @@
 
 from __future__ import annotations
 
+# Used for set_my_commands (Telegram "/" menu) and the /hilfe response.
+# Keep descriptions concise — Telegram truncates long ones in the menu.
+USER_COMMANDS: list[tuple[str, str]] = [
+    ("suche", "Automaten in der Nähe finden"),
+    ("alle_zeigen", "Karte aller Automaten anzeigen"),
+    ("finden", "Per Name suchen (z. B. Hamburg Dom)"),
+    ("details", "Details zu einem Automaten"),
+    ("besucht", "Automat als besucht markieren"),
+    ("nicht_besucht", "Besuchsmarkierung entfernen"),
+    ("heimat", "Heimatort setzen"),
+    ("beobachten", "Neue Automaten im Umkreis beobachten"),
+    ("beobachtungen", "Beobachtungen verwalten"),
+    ("beobachtung_loeschen", "Beobachtung löschen"),
+    ("stumm", "Benachrichtigungen stummschalten"),
+    ("melden", "Automaten melden oder korrigieren"),
+    ("hilfe", "Diese Hilfe anzeigen"),
+]
+
+ADMIN_COMMANDS: list[tuple[str, str]] = [
+    ("queue", "Moderations-Warteschlange anzeigen"),
+    ("stale", "Veraltete Standorte anzeigen"),
+    ("entfernen", "Standort entfernen"),
+    ("geocodieren", "Standort manuell geocodieren"),
+]
+
 START = (
-    "Willkommen zum Pressmünzen-Bot! Hier findest du schnell heraus, wo der nächste "
-    "Stempelautomat ist.\n\n"
-    "Funktionen:\n"
-    "/suche – Automaten in der Nähe finden\n"
-    "/alle_zeigen – Karte mit allen Automaten\n"
-    "/finden <text> – Automaten per Namenssuche finden (z. B. /finden Hamburg Dom)\n"
-    "/details <id> – Details zu einem Automaten (z. B. /details 2023)\n"
-    "/besucht <id> – Automat als besucht markieren\n"
-    "/nicht_besucht <id> – Markierung entfernen\n"
-    "/heimat – Heimatort setzen (für Benachrichtigungen)\n"
-    "/beobachten <radius_km> – neue Automaten im Umkreis beobachten\n"
-    "/beobachtungen – Beobachtungen verwalten\n"
-    "/stumm – Benachrichtigungen stummschalten\n"
-    "/melden <id> – einen Automaten melden oder korrigieren"
+    "Willkommen beim Pressmünzen-Bot!\n\n"
+    "Hier findest du schnell den nächsten Stempelautomaten in deiner Nähe.\n\n"
+    "Mit /hilfe siehst du alle verfügbaren Befehle."
 )
+
+HELP = "Verfügbare Befehle:\n" + "\n".join(f"/{cmd} – {desc}" for cmd, desc in USER_COMMANDS)
 
 SUCHE_START = (
     "Willst du alle Automaten im Umkreis von n Kilometern oder insgesamt die "

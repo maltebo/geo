@@ -30,6 +30,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await require_message(update).reply_text(texts.START)
 
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await require_message(update).reply_text(texts.HELP)
+
+
 async def whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Help users find their chat id (for ADMIN_CHAT_IDS configuration)."""
     await require_message(update).reply_text(f"chat_id: {require_chat_id(update)}")

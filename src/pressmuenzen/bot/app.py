@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from telegram import Update
+from telegram import BotCommand, BotCommandScopeChat, Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -15,6 +15,7 @@ from telegram.ext import (
     filters,
 )
 
+from pressmuenzen.bot import texts
 from pressmuenzen.bot.handlers import (
     admin,
     admin_geocode,
@@ -39,15 +40,31 @@ async def _on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     log.error("unhandled bot error", exc_info=context.error)
 
 
+async def _setup_commands(app: _Application) -> None:
+    """Register the command menu shown when a user types '/' in the chat."""
+    user_cmds = [BotCommand(cmd, desc) for cmd, desc in texts.USER_COMMANDS]
+    await app.bot.set_my_commands(user_cmds)
+
+    settings = get_settings()
+    if settings.admin_chat_ids:
+        admin_extra = [BotCommand(cmd, desc) for cmd, desc in texts.ADMIN_COMMANDS]
+        for chat_id in settings.admin_chat_ids:
+            await app.bot.set_my_commands(
+                user_cmds + admin_extra,
+                scope=BotCommandScopeChat(chat_id=chat_id),
+            )
+
+
 def build_application() -> _Application:
     settings = get_settings()
     if not settings.telegram_token:
         raise RuntimeError("TELEGRAM_TOKEN is not set")
 
-    app = ApplicationBuilder().token(settings.telegram_token).build()
+    app = ApplicationBuilder().token(settings.telegram_token).post_init(_setup_commands).build()
 
     # Simple commands.
     app.add_handler(CommandHandler("start", details.start))
+    app.add_handler(CommandHandler("hilfe", details.help_cmd))
     app.add_handler(CommandHandler("whoami", details.whoami))
     app.add_handler(CommandHandler("alle_zeigen", details.show_all))
     app.add_handler(CommandHandler("details", details.details))
