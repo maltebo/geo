@@ -112,6 +112,7 @@ CORRECTION_NOT_FOUND = "Meldung {id} wurde nicht gefunden."
 NOTIFY_ADMIN_ADDED = "Neue Standorte hinzugefügt ({count}):"
 NOTIFY_ADMIN_ADDED_ITEM = "#{id} {name}\n{url}"
 NOTIFY_ADMIN_DELETED = "Standort entfernt: #{id} {name}"
+NOTIFY_ADMIN_NEW_CORRECTION = "Neue Meldung #{id} [{type}] {name}\n{comment}"
 
 # Stale-location review (/stale) and admin removal (/entfernen)
 STALE_NONE = "Keine veralteten Standorte: alle wurden kürzlich in der Quelle gesehen."

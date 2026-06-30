@@ -17,6 +17,7 @@ from pressmuenzen.db.repositories.corrections import CorrectionRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
 from pressmuenzen.db.repositories.users import UserRepository
 from pressmuenzen.domain.models import Coordinate, CorrectionType
+from pressmuenzen.services.notifications import notify_admins
 
 REPORT_WAIT = 0
 
@@ -116,21 +117,33 @@ async def handle_deeplink_correction(update: Update, context: ContextTypes.DEFAU
     machine_id, lat, lon = parsed
     chat_id = require_chat_id(update)
 
+    correction_id: int | None = None
+    machine_name: str = str(machine_id)
     async with session_scope() as session:
         machine = await MachineRepository(session).get(machine_id)
         if machine is None:
             await message.reply_text(texts.DETAILS_NOT_FOUND.format(id=machine_id))
             return
+        machine_name = machine.name
         user = await UserRepository(session).get_or_create(chat_id)
-        await CorrectionRepository(session).create(
+        correction = await CorrectionRepository(session).create(
             machine_id=machine_id,
             user_id=user.id,
             type_=CorrectionType.GPS,
             comment="Korrigierte Position per Karten-Klick",
             proposed=Coordinate(lat=lat, lon=lon),
         )
+        correction_id = correction.id
 
-    await message.reply_text(texts.REPORT_DEEPLINK_THANKS.format(name=machine.name))
+    await message.reply_text(texts.REPORT_DEEPLINK_THANKS.format(name=machine_name))
+    await notify_admins(
+        texts.NOTIFY_ADMIN_NEW_CORRECTION.format(
+            id=correction_id,
+            type=CorrectionType.GPS.value,
+            name=machine_name,
+            comment="Korrigierte Position per Karten-Klick",
+        )
+    )
 
 
 async def _store_correction(
@@ -147,14 +160,28 @@ async def _store_correction(
         await message.reply_text(texts.GENERIC_ERROR)
         return
     chat_id = require_chat_id(update)
+    correction_id: int | None = None
+    machine_name: str = str(machine_id)
     async with session_scope() as session:
+        machine = await MachineRepository(session).get(machine_id)
+        if machine is not None:
+            machine_name = machine.name
         user = await UserRepository(session).get_or_create(chat_id)
-        await CorrectionRepository(session).create(
+        correction = await CorrectionRepository(session).create(
             machine_id=machine_id,
             user_id=user.id,
             type_=type_,
             comment=comment,
             proposed=proposed,
         )
+        correction_id = correction.id
     user_data.pop("report_machine_id", None)
     await message.reply_text(texts.REPORT_THANKS)
+    await notify_admins(
+        texts.NOTIFY_ADMIN_NEW_CORRECTION.format(
+            id=correction_id,
+            type=type_.value,
+            name=machine_name,
+            comment=comment,
+        )
+    )
