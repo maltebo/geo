@@ -95,6 +95,7 @@
     document.body.appendChild(el);
     el.style.display = "none";
     document.getElementById("confirm-cancel").addEventListener("click", cancelEdit);
+    document.getElementById("confirm-link").addEventListener("click", cancelEdit);
     return el;
   }());
 
