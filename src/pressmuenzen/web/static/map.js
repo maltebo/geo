@@ -53,7 +53,7 @@
     return html;
   }
 
-  // --- Coordinate correction: click-to-pick mode ----------------------------
+  // --- Coordinate correction: click-to-pick + address-search mode -----------
 
   // Encode lat/lon as integers (x1e6) for a Telegram deep-link start payload.
   // Negative values get an "n" prefix; hyphens adjacent to underscores interact
@@ -74,11 +74,24 @@
     var el = document.createElement("div");
     el.id = "pick-hint";
     el.innerHTML =
-      "Klicke auf die korrekte Position" +
-      ' &nbsp;<button id="pick-cancel">Abbrechen</button>';
+      '<div class="pick-hint-row">' +
+        'Klicke auf die korrekte Position' +
+        ' &nbsp;<button id="pick-cancel">Abbrechen</button>' +
+      '</div>' +
+      '<div class="pick-hint-row">' +
+        '<span class="pick-or">oder</span>' +
+        '<input id="addr-input" class="addr-input" type="text"' +
+          ' placeholder="Adresse eingeben…" autocomplete="off" />' +
+        '<button id="addr-search" class="addr-btn">Suchen</button>' +
+      '</div>' +
+      '<div id="addr-error" class="addr-error"></div>';
     document.body.appendChild(el);
     el.style.display = "none";
     document.getElementById("pick-cancel").addEventListener("click", cancelEdit);
+    document.getElementById("addr-search").addEventListener("click", searchAddress);
+    document.getElementById("addr-input").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); searchAddress(); }
+    });
     return el;
   }());
 
@@ -114,18 +127,16 @@
     map.getContainer().classList.remove("picking");
     pickHint.style.display = "none";
     confirmOverlay.style.display = "none";
+    document.getElementById("addr-input").value = "";
+    document.getElementById("addr-error").textContent = "";
   }
 
-  map.on("click", function (e) {
-    if (!editState) return;
-
-    var lat = e.latlng.lat;
-    var lon = e.latlng.lng;
-
+  function placePickMarker(lat, lon) {
     if (editState.pendingMarker) map.removeLayer(editState.pendingMarker);
     editState.pendingMarker = L.marker([lat, lon], {
       icon: colorIcon("#e67e00"),
     }).addTo(map);
+    map.panTo([lat, lon]);
 
     var payload = deepLinkPayload(editState.machineId, lat, lon);
     var href = "https://t.me/" + cfg.botUsername + "?start=" + payload;
@@ -136,7 +147,35 @@
 
     pickHint.style.display = "none";
     confirmOverlay.style.display = "flex";
+  }
+
+  map.on("click", function (e) {
+    if (!editState) return;
+    placePickMarker(e.latlng.lat, e.latlng.lng);
   });
+
+  function searchAddress() {
+    if (!editState) return;
+    var q = document.getElementById("addr-input").value.trim();
+    if (!q) return;
+    var errEl = document.getElementById("addr-error");
+    errEl.textContent = "";
+
+    fetch("/api/geocode?" + new URLSearchParams({ q: q }))
+      .then(function (r) {
+        if (r.status === 404) throw new Error("not_found");
+        if (!r.ok) throw new Error("error");
+        return r.json();
+      })
+      .then(function (data) {
+        placePickMarker(data.lat, data.lon);
+      })
+      .catch(function (e) {
+        errEl.textContent = e.message === "not_found"
+          ? "Adresse nicht gefunden."
+          : "Fehler bei der Suche.";
+      });
+  }
 
   // Wire "Standort korrigieren" clicks via event delegation.
   document.addEventListener("click", function (e) {

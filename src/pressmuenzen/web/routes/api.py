@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.repositories.machines import MachineRepository
-from pressmuenzen.domain.models import GpsSource
+from pressmuenzen.domain.models import Coordinate, GpsSource
+from pressmuenzen.scraper.geocoding import Geocoder
 from pressmuenzen.services.maps import machines_to_geojson
 
 router = APIRouter(prefix="/api")
@@ -41,3 +42,17 @@ async def machines(
         and (category is None or h.category == category)
     ]
     return machines_to_geojson(filtered)
+
+
+async def _resolve_address(geocoder: Geocoder, q: str) -> Coordinate:
+    coord = await geocoder.geocode(q)
+    if coord is None:
+        raise HTTPException(status_code=404, detail="Adresse nicht gefunden")
+    return coord
+
+
+@router.get("/geocode")
+async def geocode_address(q: str = Query(min_length=1)) -> dict[str, float]:
+    async with session_scope() as session:
+        coord = await _resolve_address(Geocoder(session), q)
+    return {"lat": coord.lat, "lon": coord.lon}
