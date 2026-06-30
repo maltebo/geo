@@ -40,10 +40,24 @@ html, body { height: 100%; margin: 0; }
   border-radius: 8px;
   font: 14px/1.4 system-ui, sans-serif;
   pointer-events: auto;
+  max-width: min(520px, calc(100vw - 32px));
+  width: max-content;
+}
+.pick-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pick-hint-row + .pick-hint-row {
+  margin-top: 8px;
+}
+.pick-or {
+  opacity: 0.65;
+  font-size: 12px;
   white-space: nowrap;
 }
 #pick-hint button {
-  margin-left: 10px;
   padding: 3px 10px;
   border: 1px solid #fff;
   border-radius: 4px;
@@ -51,6 +65,39 @@ html, body { height: 100%; margin: 0; }
   color: #fff;
   cursor: pointer;
   font-size: 13px;
+  white-space: nowrap;
+}
+.addr-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: 13px system-ui, sans-serif;
+  outline: none;
+}
+.addr-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+.addr-input:focus {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.2);
+}
+.addr-btn {
+  padding: 3px 10px;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.addr-error {
+  color: #ffb3b3;
+  font-size: 12px;
+  min-height: 1em;
+  margin-top: 4px;
 }
 
 /* Overlay asking user to open the link in Telegram */
