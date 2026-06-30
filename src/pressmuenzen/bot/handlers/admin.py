@@ -7,6 +7,7 @@ from a DB column. Adding an admin = editing one env value and restarting.
 from __future__ import annotations
 
 import math
+import re
 from datetime import UTC, datetime
 
 from telegram import Update
@@ -88,14 +89,12 @@ async def queue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for c, machine_name, prop_lat, prop_lon, mach_lat, mach_lon in pending:
             name = machine_name or f"#{c.machine_id}"
             if c.type == CorrectionType.GPS and prop_lat is not None and prop_lon is not None:
-                lines.append(_format_gps_item(c.id, name, prop_lat, prop_lon, mach_lat, mach_lon))
+                item = _format_gps_item(c.id, name, prop_lat, prop_lon, mach_lat, mach_lon)
             else:
-                lines.append(
-                    texts.QUEUE_ITEM.format(
-                        id=c.id, type=c.type, name=name, comment=c.comment or ""
-                    )
+                item = texts.QUEUE_ITEM.format(
+                    id=c.id, type=c.type, name=name, comment=c.comment or ""
                 )
-        lines.append("\nAnnehmen: /ok <id>   Ablehnen: /nope <id>")
+            lines.append(item + texts.QUEUE_ITEM_ACTIONS.format(id=c.id))
     await message.reply_text("\n".join(lines))
 
 
@@ -137,6 +136,52 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await message.reply_text(texts.NOPE_USAGE)
         return
     correction_id = int(args[0])
+    async with session_scope() as session:
+        ok = await CorrectionService(session).reject(correction_id, require_chat_id(update))
+    await message.reply_text(
+        texts.CORRECTION_REJECTED.format(id=correction_id)
+        if ok
+        else texts.CORRECTION_NOT_FOUND.format(id=correction_id)
+    )
+
+
+async def approve_shortcut(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /ok_<id> one-tap shortcut links shown in the queue."""
+    message = require_message(update)
+    if not _is_admin(update):
+        await message.reply_text(texts.ADMIN_ONLY)
+        return
+    m = re.match(r"^/ok_(\d+)", message.text or "")
+    if not m:
+        await message.reply_text(texts.OK_USAGE)
+        return
+    correction_id = int(m.group(1))
+    async with session_scope() as session:
+        result = await CorrectionService(session).approve(correction_id, require_chat_id(update))
+    await message.reply_text(
+        texts.CORRECTION_APPROVED.format(id=correction_id)
+        if result.applied
+        else texts.CORRECTION_NOT_FOUND.format(id=correction_id)
+    )
+    if result.deleted_machine_name is not None:
+        await notify_admins(
+            texts.NOTIFY_ADMIN_DELETED.format(
+                id=result.deleted_machine_id, name=result.deleted_machine_name
+            )
+        )
+
+
+async def reject_shortcut(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /nope_<id> one-tap shortcut links shown in the queue."""
+    message = require_message(update)
+    if not _is_admin(update):
+        await message.reply_text(texts.ADMIN_ONLY)
+        return
+    m = re.match(r"^/nope_(\d+)", message.text or "")
+    if not m:
+        await message.reply_text(texts.NOPE_USAGE)
+        return
+    correction_id = int(m.group(1))
     async with session_scope() as session:
         ok = await CorrectionService(session).reject(correction_id, require_chat_id(update))
     await message.reply_text(

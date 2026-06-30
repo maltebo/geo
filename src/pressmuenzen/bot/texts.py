@@ -102,6 +102,7 @@ QUEUE_ITEM_GPS = (
 QUEUE_ITEM_GPS_NO_OLD = (
     "#{id} [gps] {name} (kein bisheriger Standort)\n  Neu: {new_url}\n  Karte: {map_url}"
 )
+QUEUE_ITEM_ACTIONS = "\n  /ok_{id}  /nope_{id}"
 OK_USAGE = "Bitte benutze: /ok <correction_id>"
 NOPE_USAGE = "Bitte benutze: /nope <correction_id>"
 CORRECTION_APPROVED = "Meldung {id} wurde angenommen."
