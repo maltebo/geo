@@ -139,23 +139,24 @@ def extract_from_thread(text: str) -> ExtractionResult:
     Raises on API errors — callers should catch and log, then continue with
     the next machine (per-machine isolation, same as the scraper pipeline).
     """
-    import google.generativeai as genai  # lazy: only needed at runtime, not for tests
+    from google import genai  # lazy: only needed at runtime, not for tests
 
     settings = get_settings()
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is not set; AI extraction is disabled")
 
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(
-        model_name=settings.gemini_model,
+    client = genai.Client(api_key=settings.gemini_api_key)
+    interaction = client.interactions.create(
+        model=settings.gemini_model,
         system_instruction=_SYSTEM_PROMPT,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            response_schema=_RESPONSE_SCHEMA,
-        ),
+        input=text,
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": _RESPONSE_SCHEMA,
+        },
     )
-    response = model.generate_content(text)
-    raw = json.loads(response.text)
+    raw = json.loads(interaction.output_text)
     return _parse_response(raw)
 
 
