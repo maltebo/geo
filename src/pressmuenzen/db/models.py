@@ -114,6 +114,16 @@ class Machine(Base):
     )
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # AI extraction fields (populated by the nightly ai-extract job)
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Bespoke JSON spec: {"periods": [{"days": [...], "open": "HH:MM", "close": "HH:MM"}], "notes": "..."}
+    opening_hours: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thread_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_message_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_ai_analyzed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     region: Mapped[Region | None] = relationship(back_populates="machines")
     candidates: Mapped[list[CoordinateCandidate]] = relationship(
         back_populates="machine", cascade="all, delete-orphan"
@@ -246,3 +256,22 @@ class NotificationSent(Base):
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class AiExtractRun(Base):
+    """Audit log for each nightly AI extraction run, mirroring scrape_runs."""
+
+    __tablename__ = "ai_extract_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="running", nullable=False)
+    budget: Mapped[int] = mapped_column(Integer, nullable=False)
+    threads_fetched: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    llm_calls_made: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    candidates_added: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    corrections_enqueued: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    errors_json: Mapped[str | None] = mapped_column(Text, nullable=True)

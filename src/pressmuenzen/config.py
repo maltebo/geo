@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables / ``.env``."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", ".env.dev"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -59,6 +59,17 @@ class Settings(BaseSettings):
     scraper_canary_min_parse_rate: float = Field(
         default=0.85, alias="SCRAPER_CANARY_MIN_PARSE_RATE"
     )
+
+    # AI extraction
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    # Free-tier model with 500 RPD / 15 RPM — verify the exact API model ID in AI Studio
+    # if the default ever stops resolving (Google occasionally renames preview models).
+    gemini_model: str = Field(default="gemini-3.1-flash-lite", alias="GEMINI_MODEL")
+    # Number of LLM calls (not rows picked) per nightly run.
+    ai_extract_nightly_budget: int = Field(default=300, alias="AI_EXTRACT_NIGHTLY_BUDGET")
+    # LLM calls per minute — stay below the free-tier RPM limit with a safety margin.
+    # Gemini 3.1 Flash Lite allows 15 RPM; 10 RPM leaves a 33% buffer.
+    ai_extract_rpm: int = Field(default=10, alias="AI_EXTRACT_RPM")
 
     # Moderation
     # A machine the scraper has not re-seen for this many days is surfaced by the

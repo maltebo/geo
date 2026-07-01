@@ -48,11 +48,39 @@ def test_none_candidates_are_ignored() -> None:
     assert coord == C
 
 
+def test_ai_address_beats_full_name_geocode() -> None:
+    _, source = resolve(
+        [_cand(GpsSource.FULL_NAME_GEOCODE), _cand(GpsSource.AI_ADDRESS_GEOCODE, C2)]
+    )
+    assert source is GpsSource.AI_ADDRESS_GEOCODE
+
+
+def test_forum_gps_beats_ai_address() -> None:
+    _, source = resolve([_cand(GpsSource.AI_ADDRESS_GEOCODE), _cand(GpsSource.FORUM_GPS, C2)])
+    assert source is GpsSource.FORUM_GPS
+
+
+def test_ai_address_low_beats_partial_name() -> None:
+    _, source = resolve(
+        [_cand(GpsSource.PARTIAL_NAME_GEOCODE), _cand(GpsSource.AI_ADDRESS_GEOCODE_LOW, C2)]
+    )
+    assert source is GpsSource.AI_ADDRESS_GEOCODE_LOW
+
+
+def test_full_name_beats_ai_address_low() -> None:
+    _, source = resolve(
+        [_cand(GpsSource.AI_ADDRESS_GEOCODE_LOW), _cand(GpsSource.FULL_NAME_GEOCODE, C2)]
+    )
+    assert source is GpsSource.FULL_NAME_GEOCODE
+
+
 def test_precedence_order_is_the_documented_contract() -> None:
     order = [
         GpsSource.CORRECTED,
         GpsSource.FORUM_GPS,
+        GpsSource.AI_ADDRESS_GEOCODE,
         GpsSource.FULL_NAME_GEOCODE,
+        GpsSource.AI_ADDRESS_GEOCODE_LOW,
         GpsSource.PARTIAL_NAME_GEOCODE,
     ]
     precedences = [s.precedence for s in order]

@@ -16,9 +16,15 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# Drop a trailing "(Automat ...)" disambiguator before geocoding at all -- it is
-# never part of a place name. Greedy, matching the legacy regex exactly.
-_AUTOMAT_SUFFIX = re.compile(r"\(Auto.*\)")
+# Drop "Automat N" disambiguators (any bracket style or bare) before geocoding
+# -- they are never part of a place name. Mirrors _AUTOMAT_RE in geocoding.py.
+_AUTOMAT_SUFFIX = re.compile(
+    r"\[Automat\s*\d+\]"
+    r"|\(Automat\s*\d+\)"
+    r'|"Automat\s*\d+"'
+    r"|Automat\s*\d+",
+    re.IGNORECASE,
+)
 # The quoted shop/landmark name: straight or German opening/closing quotes.
 _QUOTED = re.compile(r'["„].*["“]')
 # Any parenthesised aside left after the automat suffix is removed.

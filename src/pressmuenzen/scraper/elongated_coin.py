@@ -94,8 +94,10 @@ class ElongatedCoinSource:
     @staticmethod
     def _next_page(link: str) -> str:
         match = re.match(r".*start=(\d+)", link)
-        start = int(match.group(1)) if match else 0
-        return re.sub(r"start=\d+", f"start={start + _PAGE_SIZE}", link)
+        if match:
+            start = int(match.group(1))
+            return re.sub(r"start=\d+", f"start={start + _PAGE_SIZE}", link)
+        return f"{link}&start={_PAGE_SIZE}"
 
     @staticmethod
     def _is_last_page(soup: BeautifulSoup) -> bool:
@@ -108,6 +110,33 @@ class ElongatedCoinSource:
         except ValueError:
             return True
         return words[index + 1].strip() == words[index + 3].strip()
+
+    # --- full thread ---------------------------------------------------------
+
+    async def fetch_thread_text(self, topic_url: str) -> tuple[str, int]:
+        """Fetch all posts from a topic URL, including paginated replies.
+
+        Returns (concatenated_text, post_count). Posts are separated by a
+        delimiter line so the LLM can distinguish boundaries. The same 1 req/s
+        limiter applies — callers must budget time accordingly.
+        """
+        posts: list[str] = []
+        await self._collect_posts(topic_url, posts)
+        return "\n\n---\n\n".join(posts), len(posts)
+
+    async def _collect_posts(self, page_url: str, acc: list[str]) -> None:
+        soup = await self._soup(page_url)
+        for post in soup.find_all("div", class_=re.compile(r"post bg[12].*")):
+            if not isinstance(post, Tag):
+                continue
+            author_tag = post.find("p", class_="author")
+            author = author_tag.get_text(strip=True) if isinstance(author_tag, Tag) else ""
+            content_tag = post.find("div", class_="content")
+            if isinstance(content_tag, Tag):
+                body = content_tag.get_text(separator="\n", strip=True)
+                acc.append(f"[{author}]\n{body}")
+        if not self._is_last_page(soup):
+            await self._collect_posts(self._next_page(page_url), acc)
 
     # --- single machine ------------------------------------------------------
 
