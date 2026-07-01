@@ -19,8 +19,19 @@ def test_quoted_shop_name_falls_back_to_place() -> None:
     assert name_geocode_queries('Edinburgh "Bonnie Scotland"').partials == ["Edinburgh"]
 
 
-def test_full_name_keeps_quotes_but_strips_automat_suffix() -> None:
-    q = name_geocode_queries('Hamburg "Hamburger DOM" (Automat 1)')
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "(Automat 1)",
+        "[Automat 2]",
+        '"Automat 3"',
+        "Automat 4",
+        "(automat 5)",
+        "[AUTOMAT 6]",
+    ],
+)
+def test_full_name_strips_automat_in_any_bracket_style(suffix: str) -> None:
+    q = name_geocode_queries(f'Hamburg "Hamburger DOM" {suffix}')
     assert q.full == 'Hamburg "Hamburger DOM"'
     assert q.partials == ["Hamburg"]
 
