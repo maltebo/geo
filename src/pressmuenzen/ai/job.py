@@ -131,6 +131,16 @@ async def run_ai_extract(budget: int | None = None) -> None:
         errors=len(errors),
     )
 
+    await _notify_admins(
+        status=status,
+        budget=effective_budget,
+        threads_fetched=threads_fetched,
+        llm_calls=llm_calls,
+        candidates_added=candidates_added,
+        corrections_enqueued=corrections_enqueued,
+        errors=errors,
+    )
+
 
 async def _pick_machines(session, budget: int) -> list[Machine]:  # type: ignore[no-untyped-def]
     """Return up to ``budget`` active machines ordered by coordinate uncertainty."""
@@ -225,6 +235,40 @@ async def _process_location(
 
     machine.last_ai_analyzed_at = datetime.now(UTC)
     return candidates_added, corrections_enqueued
+
+
+async def _notify_admins(
+    *,
+    status: str,
+    budget: int,
+    threads_fetched: int,
+    llm_calls: int,
+    candidates_added: int,
+    corrections_enqueued: int,
+    errors: list[str],
+) -> None:
+    from pressmuenzen.services.notifications import notify_admins
+
+    skipped = threads_fetched - llm_calls
+    status_line = "OK" if status == "ok" else f"PARTIAL ({len(errors)} Fehler)"
+
+    lines = [
+        f"AI-Extract abgeschlossen — {status_line}",
+        f"Threads geladen: {threads_fetched}/{budget}"
+        + (f" ({skipped} unverändert, kein LLM-Aufruf)" if skipped else ""),
+        f"LLM-Aufrufe: {llm_calls} | Neue Koordinaten: {candidates_added} | Umzugs-Hinweise: {corrections_enqueued}",
+    ]
+    if corrections_enqueued:
+        lines.append("→ Umzugs-Hinweise bitte über /queue prüfen und bestätigen.")
+    if errors:
+        lines.append("")
+        lines.append("Fehler (erste 5):")
+        for e in errors[:5]:
+            lines.append(f"  • {e}")
+        if len(errors) > 5:
+            lines.append(f"  … und {len(errors) - 5} weitere (ai_extract_runs.errors_json)")
+
+    await notify_admins("\n".join(lines))
 
 
 def _persist_thread_meta(machine: Machine, thread_hash: str, msg_count: int) -> None:
