@@ -17,6 +17,7 @@ import json
 from datetime import UTC, datetime
 
 import httpx
+from aiolimiter import AsyncLimiter
 from sqlalchemy import asc, case, nulls_first, select
 
 from pressmuenzen.ai.extract import _CONFIDENCE_RANK, ExtractionResult, extract_from_thread
@@ -38,8 +39,14 @@ async def run_ai_extract(budget: int | None = None) -> None:
     settings = get_settings()
     effective_budget = budget if budget is not None else settings.ai_extract_nightly_budget
     min_conf = settings.ai_extract_min_confidence
+    llm_limiter = AsyncLimiter(max_rate=settings.ai_extract_rpm, time_period=60.0)
 
-    log.info("ai-extract started", budget=effective_budget, min_confidence=min_conf)
+    log.info(
+        "ai-extract started",
+        budget=effective_budget,
+        min_confidence=min_conf,
+        rpm=settings.ai_extract_rpm,
+    )
 
     async with session_scope() as session:
         run = AiExtractRun(status="running", budget=effective_budget)
@@ -77,7 +84,8 @@ async def run_ai_extract(budget: int | None = None) -> None:
                             m.thread_content_hash = thread_hash
                     continue
 
-                result = extract_from_thread(thread_text)
+                async with llm_limiter:
+                    result = extract_from_thread(thread_text)
                 llm_calls += 1
                 log.info(
                     "llm extraction done",

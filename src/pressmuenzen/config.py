@@ -62,11 +62,16 @@ class Settings(BaseSettings):
 
     # AI extraction
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-1.5-flash", alias="GEMINI_MODEL")
+    # Free-tier model with 500 RPD / 15 RPM — verify the exact API model ID in AI Studio
+    # if the default ever stops resolving (Google occasionally renames preview models).
+    gemini_model: str = Field(default="gemini-3.1-flash-lite", alias="GEMINI_MODEL")
     # Number of LLM calls (not rows picked) per nightly run.
     ai_extract_nightly_budget: int = Field(default=30, alias="AI_EXTRACT_NIGHTLY_BUDGET")
     # Minimum confidence level to create an AI_ADDRESS_GEOCODE candidate ("medium" or "high").
     ai_extract_min_confidence: str = Field(default="medium", alias="AI_EXTRACT_MIN_CONFIDENCE")
+    # LLM calls per minute — stay below the free-tier RPM limit with a safety margin.
+    # Gemini 3.1 Flash Lite allows 15 RPM; 10 RPM leaves a 33% buffer.
+    ai_extract_rpm: int = Field(default=10, alias="AI_EXTRACT_RPM")
 
     # Moderation
     # A machine the scraper has not re-seen for this many days is surfaced by the
