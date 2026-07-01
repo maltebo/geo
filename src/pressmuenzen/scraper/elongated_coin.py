@@ -94,8 +94,10 @@ class ElongatedCoinSource:
     @staticmethod
     def _next_page(link: str) -> str:
         match = re.match(r".*start=(\d+)", link)
-        start = int(match.group(1)) if match else 0
-        return re.sub(r"start=\d+", f"start={start + _PAGE_SIZE}", link)
+        if match:
+            start = int(match.group(1))
+            return re.sub(r"start=\d+", f"start={start + _PAGE_SIZE}", link)
+        return f"{link}&start={_PAGE_SIZE}"
 
     @staticmethod
     def _is_last_page(soup: BeautifulSoup) -> bool:

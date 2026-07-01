@@ -122,6 +122,22 @@ async def test_empty_page_returns_empty_string_and_zero() -> None:
 
 
 @pytest.mark.asyncio
+async def test_multi_page_without_start_param_does_not_loop() -> None:
+    # Regression: URLs stored without ?start= caused _next_page to return the
+    # same URL, creating an infinite recursive fetch loop.
+    page1 = _phpbb_page([("Alice » 01.01.2024", "Erster Post.")], is_last=False)
+    page2 = _phpbb_page([("Bob » 02.01.2024", "Zweiter Post.")], is_last=True)
+    source = _make_source([page1, page2])
+
+    # URL has no start= parameter — as stored for some machines in the DB.
+    text, count = await source.fetch_thread_text("http://example.com/viewtopic.php?t=1")
+
+    assert count == 2
+    assert "Erster Post." in text
+    assert "Zweiter Post." in text
+
+
+@pytest.mark.asyncio
 async def test_author_included_in_output() -> None:
     page = _phpbb_page([("Hans Mustermann » 15.06.2024", "Inhalt des Beitrags.")])
     source = _make_source([page])
