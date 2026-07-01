@@ -20,7 +20,7 @@ import httpx
 from aiolimiter import AsyncLimiter
 from sqlalchemy import asc, case, nulls_first, select
 
-from pressmuenzen.ai.extract import _CONFIDENCE_RANK, ExtractionResult, extract_from_thread
+from pressmuenzen.ai.extract import ExtractionResult, extract_from_thread
 from pressmuenzen.config import get_settings
 from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.models import AiExtractRun, Machine
@@ -38,15 +38,9 @@ async def run_ai_extract(budget: int | None = None) -> None:
     configure_logging()
     settings = get_settings()
     effective_budget = budget if budget is not None else settings.ai_extract_nightly_budget
-    min_conf = settings.ai_extract_min_confidence
     llm_limiter = AsyncLimiter(max_rate=settings.ai_extract_rpm, time_period=60.0)
 
-    log.info(
-        "ai-extract started",
-        budget=effective_budget,
-        min_confidence=min_conf,
-        rpm=settings.ai_extract_rpm,
-    )
+    log.info("ai-extract started", budget=effective_budget, rpm=settings.ai_extract_rpm)
 
     async with session_scope() as session:
         run = AiExtractRun(status="running", budget=effective_budget)
@@ -108,7 +102,7 @@ async def run_ai_extract(budget: int | None = None) -> None:
                     if result.opening_hours is not None:
                         m.opening_hours = result.opening_hours.to_json()
 
-                    added, enqueued = await _process_location(repo, corr_repo, m, result, min_conf)
+                    added, enqueued = await _process_location(repo, corr_repo, m, result)
                     candidates_added += added
                     corrections_enqueued += enqueued
 
@@ -152,12 +146,11 @@ async def run_ai_extract(budget: int | None = None) -> None:
 
 async def _pick_machines(session, budget: int) -> list[Machine]:  # type: ignore[no-untyped-def]
     """Return up to ``budget`` active machines ordered by coordinate uncertainty."""
-    # Precedence of gps_source values as ordinal for ordering:
-    # none (99) > partial_name (4) > full_name (3) > ai_address (2) > forum_gps (1) > corrected (0)
-    # We want the *least reliable* coordinates first, so ORDER BY precedence DESC (higher = less sure).
+    # Mirror the _PRECEDENCE dict: higher value = less reliable = process first.
     precedence_case = case(
         (Machine.gps_source == GpsSource.NONE.value, 99),
-        (Machine.gps_source == GpsSource.PARTIAL_NAME_GEOCODE.value, 4),
+        (Machine.gps_source == GpsSource.PARTIAL_NAME_GEOCODE.value, 5),
+        (Machine.gps_source == GpsSource.AI_ADDRESS_GEOCODE_LOW.value, 4),
         (Machine.gps_source == GpsSource.FULL_NAME_GEOCODE.value, 3),
         (Machine.gps_source == GpsSource.AI_ADDRESS_GEOCODE.value, 2),
         (Machine.gps_source == GpsSource.FORUM_GPS.value, 1),
@@ -182,7 +175,6 @@ async def _process_location(
     corr_repo: CorrectionRepository,
     machine: Machine,
     result: ExtractionResult,
-    min_confidence: str,
 ) -> tuple[int, int]:
     """Apply address/move signals. Returns (candidates_added, corrections_enqueued)."""
     candidates_added = 0
@@ -205,40 +197,33 @@ async def _process_location(
         log.info("move correction enqueued", machine_id=machine.id)
 
     elif result.address_found and result.address_value:
-        conf_rank = _CONFIDENCE_RANK.get(result.address_confidence, 0)
-        min_rank = _CONFIDENCE_RANK.get(min_confidence, 1)
-
-        if conf_rank >= min_rank:
-            geocoder = Geocoder(repo.session)
-            coord = await geocoder.geocode(result.address_value)
-            if coord is not None:
-                await repo.clear_candidates_of_source(machine.id, GpsSource.AI_ADDRESS_GEOCODE)
-                await repo.add_candidate(
-                    machine.id,
-                    GpsSource.AI_ADDRESS_GEOCODE,
-                    coord,
-                    raw_text=result.address_value,
-                )
-                await repo.recompute_geom(machine.id)
-                candidates_added += 1
-                log.info(
-                    "ai address candidate added",
-                    machine_id=machine.id,
-                    address=result.address_value,
-                    confidence=result.address_confidence,
-                )
-            else:
-                log.info(
-                    "ai address did not geocode",
-                    machine_id=machine.id,
-                    address=result.address_value,
-                )
-        else:
-            log.debug(
-                "ai address below confidence threshold",
+        # medium/high confidence → AI_ADDRESS_GEOCODE (beats name geocoding)
+        # low confidence → AI_ADDRESS_GEOCODE_LOW (city-level find, below full name geocode)
+        source = (
+            GpsSource.AI_ADDRESS_GEOCODE
+            if result.address_confidence in ("medium", "high")
+            else GpsSource.AI_ADDRESS_GEOCODE_LOW
+        )
+        geocoder = Geocoder(repo.session)
+        coord = await geocoder.geocode(result.address_value)
+        if coord is not None:
+            await repo.clear_candidates_of_source(machine.id, GpsSource.AI_ADDRESS_GEOCODE)
+            await repo.clear_candidates_of_source(machine.id, GpsSource.AI_ADDRESS_GEOCODE_LOW)
+            await repo.add_candidate(machine.id, source, coord, raw_text=result.address_value)
+            await repo.recompute_geom(machine.id)
+            candidates_added += 1
+            log.info(
+                "ai address candidate added",
                 machine_id=machine.id,
+                address=result.address_value,
                 confidence=result.address_confidence,
-                threshold=min_confidence,
+                source=source.value,
+            )
+        else:
+            log.info(
+                "ai address did not geocode",
+                machine_id=machine.id,
+                address=result.address_value,
             )
 
     machine.last_ai_analyzed_at = datetime.now(UTC)

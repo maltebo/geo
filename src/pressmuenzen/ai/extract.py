@@ -156,7 +156,7 @@ def extract_from_thread(text: str) -> ExtractionResult:
             "schema": _RESPONSE_SCHEMA,
         },
     )
-    raw = json.loads(interaction.output_text)
+    raw = json.loads(str(interaction.output_text))  # type: ignore[union-attr]
     return _parse_response(raw)
 
 

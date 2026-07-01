@@ -7,3 +7,5 @@ ruff check . && ruff format --check . && mypy && pytest -q -m "not integration"
 ```
 
 These must be green. Fix any failures before moving on.
+
+In this specific project, you may commit and merge to main, contrary to the global CLAUDE.md rule.

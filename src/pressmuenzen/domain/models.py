@@ -10,14 +10,21 @@ class GpsSource(enum.StrEnum):
     """Where a coordinate came from, in descending order of trust.
 
     The numeric ``precedence`` (lower = more trusted) is the contract used by
-    :mod:`pressmuenzen.domain.precedence`. Preserving these exact tiers keeps the
-    legacy precedence behaviour (``corrected > forum_gps > ai_address > full_name > partial_name``).
+    :mod:`pressmuenzen.domain.precedence`.
+
+        corrected > forum_gps > ai_address > full_name > ai_address_low > partial_name
+
+    ai_address_geocode     — AI found a specific address (medium/high confidence).
+    ai_address_geocode_low — AI found only a city or landmark (low confidence);
+                             still better than nothing, but ranked below a full
+                             name geocode.
     """
 
     CORRECTED = "corrected"
     FORUM_GPS = "forum_gps"
     AI_ADDRESS_GEOCODE = "ai_address_geocode"
     FULL_NAME_GEOCODE = "full_name_geocode"
+    AI_ADDRESS_GEOCODE_LOW = "ai_address_geocode_low"
     PARTIAL_NAME_GEOCODE = "partial_name_geocode"
     NONE = "none"
 
@@ -31,7 +38,8 @@ _PRECEDENCE: dict[GpsSource, int] = {
     GpsSource.FORUM_GPS: 1,
     GpsSource.AI_ADDRESS_GEOCODE: 2,
     GpsSource.FULL_NAME_GEOCODE: 3,
-    GpsSource.PARTIAL_NAME_GEOCODE: 4,
+    GpsSource.AI_ADDRESS_GEOCODE_LOW: 4,
+    GpsSource.PARTIAL_NAME_GEOCODE: 5,
     GpsSource.NONE: 99,
 }
 

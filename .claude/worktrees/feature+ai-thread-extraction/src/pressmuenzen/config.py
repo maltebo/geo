@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables / ``.env``."""
 
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.dev"),
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-3.1-flash-lite", alias="GEMINI_MODEL")
     # Number of LLM calls (not rows picked) per nightly run.
     ai_extract_nightly_budget: int = Field(default=300, alias="AI_EXTRACT_NIGHTLY_BUDGET")
+    # Minimum confidence level to create an AI_ADDRESS_GEOCODE candidate ("medium" or "high").
+    ai_extract_min_confidence: str = Field(default="medium", alias="AI_EXTRACT_MIN_CONFIDENCE")
     # LLM calls per minute — stay below the free-tier RPM limit with a safety margin.
     # Gemini 3.1 Flash Lite allows 15 RPM; 10 RPM leaves a 33% buffer.
     ai_extract_rpm: int = Field(default=10, alias="AI_EXTRACT_RPM")

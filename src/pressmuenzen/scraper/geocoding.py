@@ -8,6 +8,8 @@ geocoding) and by the bot (resolving a user-typed address).
 
 from __future__ import annotations
 
+import re
+
 import httpx
 from aiolimiter import AsyncLimiter
 from sqlalchemy import select
@@ -26,6 +28,20 @@ _NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 # Process-wide 1 req/s limiter, shared across all callers in this process.
 _limiter = AsyncLimiter(max_rate=1, time_period=1.0)
 
+# Strip "Automat N" disambiguators (with any bracket style, or bare) before
+# sending to Nominatim -- they are never part of a place name.
+_AUTOMAT_RE = re.compile(
+    r"\[Automat\s*\d+\]"  # [Automat N]
+    r"|\(Automat\s*\d+\)"  # (Automat N)
+    r'|"Automat\s*\d+"'  # "Automat N"
+    r"|Automat\s*\d+",  # bare Automat N
+    re.IGNORECASE,
+)
+
+
+def _strip_automat(query: str) -> str:
+    return " ".join(_AUTOMAT_RE.sub("", query).split())
+
 
 class Geocoder:
     def __init__(self, session: AsyncSession) -> None:
@@ -33,7 +49,7 @@ class Geocoder:
         self._ua = get_settings().nominatim_user_agent
 
     async def geocode(self, query: str) -> Coordinate | None:
-        query = query.strip()
+        query = _strip_automat(query.strip())
         if not query:
             return None
 
