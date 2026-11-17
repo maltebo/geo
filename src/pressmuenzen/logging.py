@@ -21,6 +21,9 @@ def configure_logging() -> None:
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level)
+    # httpx logs every request URL at INFO; Telegram URLs embed the bot token.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(max(level, logging.WARNING))
 
     shared_processors: list[structlog.typing.Processor] = [
         structlog.contextvars.merge_contextvars,
