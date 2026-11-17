@@ -146,16 +146,13 @@ class ElongatedCoinSource:
         if not isinstance(first_post, Tag):
             return None
 
-        if not first_post.find("span", string=re.compile("Standortbeschreibung.*")):
-            # Not a location entry (e.g. an announcement topic).
-            return ScrapedMachine(
-                source_url=topic.url,
-                name=topic.name,
-                region=region,
-                is_location_entry=False,
-            )
-
-        description = self._location_description(first_post)
+        # Early (2007-era) entries are free text without the "Standortbeschreibung" heading.
+        # They are still locations; only the template flag (the canary signal) differs.
+        matches_template = first_post.find("span", string=re.compile("Standortbeschreibung.*"))
+        if matches_template:
+            description = self._location_description(first_post)
+        else:
+            description = self._free_text_description(first_post)
         gps_text = self._gps_text(first_post)
         entry_date = None
         author = first_post.find("p", class_="author")
@@ -169,7 +166,27 @@ class ElongatedCoinSource:
             description=description,
             gps_text=gps_text or None,
             entry_date_text=entry_date,
+            matches_template=matches_template is not None,
         )
+
+    @staticmethod
+    def _free_text_description(post: Tag) -> str:
+        """Post text up to the first bold label (e.g. "GPS Daten:"), without captions."""
+        content = post.find("div", class_="content")
+        if not isinstance(content, Tag):
+            return ""
+        lines: list[str] = []
+        for node in content.descendants:
+            if isinstance(node, Tag):
+                if _is_bold(node) and node.get_text(strip=True).endswith(":"):
+                    break
+                continue
+            if any(_is_bold(parent) for parent in node.parents):
+                continue  # photo credits and similar captions
+            text = str(node).strip()
+            if text:
+                lines.append(text)
+        return "\n".join(lines)
 
     @staticmethod
     def _location_description(post: Tag) -> str:
@@ -206,3 +223,7 @@ class ElongatedCoinSource:
             if not str(node).startswith("<"):
                 text += " " + str(node)
         return text.strip()
+
+
+def _is_bold(tag: Tag) -> bool:
+    return tag.name == "span" and tag.get("style") == "font-weight: bold"
