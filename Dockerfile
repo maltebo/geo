@@ -7,16 +7,16 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 # uv for fast, reproducible installs.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.21 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Dependency layer — only re-runs when pyproject.toml/README.md changes.
-# A stub package satisfies hatchling so the full dep graph is resolved and
-# downloaded here, before the real source is ever copied in.
-COPY pyproject.toml README.md ./
-RUN mkdir -p src/pressmuenzen && touch src/pressmuenzen/__init__.py && \
-    uv pip install --system --no-cache .
+# Dependency layer — only re-runs when pyproject.toml/uv.lock changes.
+# Install the exact versions from uv.lock; a plain `uv pip install .` resolves afresh.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv export --frozen --no-emit-project -o /tmp/requirements.txt && \
+    uv pip install --system --no-cache -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
 
 # Application code — fast reinstall, no network (deps already present above).
 COPY src ./src

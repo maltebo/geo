@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 
 import httpx
 from aiolimiter import AsyncLimiter
-from sqlalchemy import asc, case, nulls_first, select
+from sqlalchemy import case, select
 
 from pressmuenzen.ai.extract import ExtractionResult, extract_from_thread
 from pressmuenzen.config import get_settings
@@ -162,7 +162,7 @@ async def _pick_machines(session, budget: int) -> list[Machine]:  # type: ignore
         .where(Machine.status == "active")
         .order_by(
             precedence_case.desc(),
-            nulls_first(asc(Machine.last_ai_analyzed_at)),
+            Machine.last_ai_analyzed_at.asc().nulls_first(),
         )
         .limit(budget)
     )
