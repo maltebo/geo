@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from telegram import BotCommand, BotCommandScopeChat, Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
+    BaseHandler,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
@@ -19,6 +22,7 @@ from pressmuenzen.bot import texts
 from pressmuenzen.bot.handlers import (
     admin,
     admin_geocode,
+    common,
     corrections,
     details,
     search,
@@ -34,6 +38,24 @@ log = get_logger("bot")
 # data stores, job queue). We don't specialise any of them, so alias the all-Any
 # form rather than spelling it out at the call site.
 _Application = Application[Any, Any, Any, Any, Any, Any]
+
+# An abandoned conversation otherwise captures the user's next pin or text forever.
+CONVERSATION_TIMEOUT = timedelta(minutes=5)
+
+
+def _conversation(
+    entry: CommandHandler[Any, Any],
+    states: dict[object, list[BaseHandler[Any, Any, Any]]],
+) -> ConversationHandler[Any]:
+    return ConversationHandler(
+        entry_points=[entry],
+        states={
+            **states,
+            ConversationHandler.TIMEOUT: [TypeHandler(Update, common.on_conversation_timeout)],
+        },
+        fallbacks=[CommandHandler("cancel", search.cancel)],
+        conversation_timeout=CONVERSATION_TIMEOUT,
+    )
 
 
 async def _on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -89,9 +111,9 @@ def build_application() -> _Application:
 
     # /suche conversation.
     app.add_handler(
-        ConversationHandler(
-            entry_points=[CommandHandler("suche", search.start)],
-            states={
+        _conversation(
+            CommandHandler("suche", search.start),
+            {
                 search.CHOOSE_MODE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, search.choose_mode)
                 ],
@@ -101,43 +123,40 @@ def build_application() -> _Application:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, search.on_location_text),
                 ],
             },
-            fallbacks=[CommandHandler("cancel", search.cancel)],
         )
     )
 
     # /heimat conversation.
     app.add_handler(
-        ConversationHandler(
-            entry_points=[CommandHandler("heimat", watches.home_start)],
-            states={
+        _conversation(
+            CommandHandler("heimat", watches.home_start),
+            {
                 watches.HOME_WAIT: [
                     MessageHandler(filters.LOCATION, watches.home_set_from_pin),
                     MessageHandler(filters.TEXT & ~filters.COMMAND, watches.home_set_from_text),
                 ],
             },
-            fallbacks=[CommandHandler("cancel", search.cancel)],
         )
     )
 
     # /melden conversation.
     app.add_handler(
-        ConversationHandler(
-            entry_points=[CommandHandler("melden", corrections.report_start)],
-            states={
+        _conversation(
+            CommandHandler("melden", corrections.report_start),
+            {
                 corrections.REPORT_WAIT: [
                     MessageHandler(filters.LOCATION, corrections.report_pin),
                     MessageHandler(filters.TEXT & ~filters.COMMAND, corrections.report_text),
                 ],
             },
-            fallbacks=[CommandHandler("cancel", search.cancel)],
         )
     )
 
     # /geocodieren conversation (admin-only: manually geocode unresolved machines).
     app.add_handler(
-        ConversationHandler(
-            entry_points=[CommandHandler("geocodieren", admin_geocode.geocode_start)],
-            states={
+        _conversation(
+            CommandHandler("geocodieren", admin_geocode.geocode_start),
+            {
                 admin_geocode.GEOCODE_PICK: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, admin_geocode.geocode_pick)
                 ],
@@ -148,7 +167,6 @@ def build_application() -> _Application:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, admin_geocode.geocode_confirm)
                 ],
             },
-            fallbacks=[CommandHandler("cancel", search.cancel)],
         )
     )
 

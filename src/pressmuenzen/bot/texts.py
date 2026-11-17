@@ -57,6 +57,10 @@ NO_MACHINE_FOUND = "Leider wurde kein Automat gefunden."
 INVALID_OPTION = "Das war keine gültige Option. Bitte starte erneut mit /suche."
 GENERIC_ERROR = "Da ist etwas schiefgegangen ..."
 BYE = "Abgebrochen. Bis bald!"
+CONVERSATION_TIMEOUT = (
+    "Ich habe zu lange keine Antwort bekommen und die Eingabe abgebrochen. "
+    "Starte den Befehl bei Bedarf einfach neu."
+)
 
 MAP_READY = "Hier ist deine Karte: {url}"
 MAP_ALL_READY = "Karte mit allen Automaten: {url}"

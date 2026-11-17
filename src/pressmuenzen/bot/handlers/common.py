@@ -5,7 +5,7 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
-from telegram import Message, Update
+from telegram import Message, ReplyKeyboardRemove, Update
 from telegram.ext import ContextTypes
 
 from pressmuenzen.bot import texts
@@ -46,6 +46,18 @@ def require_user_data(context: ContextTypes.DEFAULT_TYPE) -> dict[Any, Any]:
     data = context.user_data
     assert data is not None, "conversation handler invoked without user_data"
     return data
+
+
+async def on_conversation_timeout(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Drop the conversation scratch state and tell the user the dialogue expired."""
+    if context.user_data is not None:
+        context.user_data.clear()
+    if isinstance(update, Update) and update.effective_chat is not None:
+        await context.bot.send_message(
+            update.effective_chat.id,
+            texts.CONVERSATION_TIMEOUT,
+            reply_markup=ReplyKeyboardRemove(),
+        )
 
 
 def hosted_map_url(origin: Coordinate, mode: str, value: float) -> str:
