@@ -1,4 +1,7 @@
-"""The /suche conversation: choose radius or N nearest, then a location."""
+"""The /suche conversation: choose radius or N nearest, then a location.
+
+Also the bare-location shortcut that skips the conversation.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +25,8 @@ from pressmuenzen.services.search import SearchService
 log = get_logger("bot.search")
 
 CHOOSE_MODE, ENTER_VALUE, ENTER_LOCATION = range(3)
+
+QUICK_NEAREST_COUNT = 10
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -67,8 +72,17 @@ async def on_location_pin(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     loc = require_message(update).location
     assert loc is not None, "location handler invoked without a location"
     origin = Coordinate(lat=loc.latitude, lon=loc.longitude)
-    await _reply_with_results(update, context, origin, origin_label=None)
+    mode, value = _mode_and_value(context)
+    await _reply_with_results(update, origin, mode, value, origin_label=None)
     return ConversationHandler.END
+
+
+async def quick_nearest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shortcut: a bare location pin outside any conversation lists the nearest machines."""
+    loc = require_message(update).location
+    assert loc is not None, "location handler invoked without a location"
+    origin = Coordinate(lat=loc.latitude, lon=loc.longitude)
+    await _reply_with_results(update, origin, "nearest", QUICK_NEAREST_COUNT, origin_label=None)
 
 
 async def on_location_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -80,20 +94,24 @@ async def on_location_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if coord is None:
         await message.reply_text(texts.ADDRESS_NOT_FOUND.format(query=query))
         return ConversationHandler.END
-    await _reply_with_results(update, context, coord, origin_label=query)
+    mode, value = _mode_and_value(context)
+    await _reply_with_results(update, coord, mode, value, origin_label=query)
     return ConversationHandler.END
+
+
+def _mode_and_value(context: ContextTypes.DEFAULT_TYPE) -> tuple[str, float]:
+    user_data = require_user_data(context)
+    return user_data.get("mode", "nearest"), float(user_data.get("value", 5))
 
 
 async def _reply_with_results(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
     origin: Coordinate,
+    mode: str,
+    value: float,
     origin_label: str | None,
 ) -> None:
     message = require_message(update)
-    user_data = require_user_data(context)
-    mode = user_data.get("mode", "nearest")
-    value = user_data.get("value", 5)
 
     async with session_scope() as session:
         service = SearchService(MachineRepository(session))

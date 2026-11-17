@@ -152,6 +152,13 @@ def build_application() -> _Application:
         )
     )
 
+    # Bare location pin outside any conversation -> nearest machines. Registered
+    # after the conversations so a pin they await (/suche, /heimat, /melden) wins.
+    # MESSAGE only: live-location edits would otherwise re-trigger it every few seconds.
+    app.add_handler(
+        MessageHandler(filters.LOCATION & filters.UpdateType.MESSAGE, search.quick_nearest)
+    )
+
     app.add_error_handler(_on_error)
     return app
 

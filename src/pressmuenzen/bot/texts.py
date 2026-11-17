@@ -29,11 +29,16 @@ ADMIN_COMMANDS: list[tuple[str, str]] = [
 
 START = (
     "Willkommen beim Pressmünzen-Bot!\n\n"
-    "Hier findest du schnell den nächsten Stempelautomaten in deiner Nähe.\n\n"
+    "Hier findest du schnell den nächsten Stempelautomaten in deiner Nähe.\n"
+    "Schick mir einfach deinen Standort, dann zeige ich dir die 10 nächsten Automaten.\n\n"
     "Mit /hilfe siehst du alle verfügbaren Befehle."
 )
 
-HELP = "Verfügbare Befehle:\n" + "\n".join(f"/{cmd} – {desc}" for cmd, desc in USER_COMMANDS)
+HELP = (
+    "Verfügbare Befehle:\n"
+    + "\n".join(f"/{cmd} – {desc}" for cmd, desc in USER_COMMANDS)
+    + "\n\nTipp: Schick mir einfach deinen Standort, dann zeige ich dir die 10 nächsten Automaten."
+)
 
 SUCHE_START = (
     "Willst du alle Automaten im Umkreis von n Kilometern oder insgesamt die "
