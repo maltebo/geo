@@ -74,5 +74,14 @@ services:
     profiles: ["tools"]
     restart: "no"
 
+  # One-shot: `docker compose run --rm ai-extractor`
+  # (invoked by a host systemd timer, after the scraper).
+  ai-extractor:
+    <<: *app-image
+    entrypoint: ["python", "-m", "pressmuenzen", "ai-extract"]
+    command: []
+    profiles: ["tools"]
+    restart: "no"
+
 volumes:
   pgdata:

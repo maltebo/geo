@@ -1,0 +1,10 @@
+[Unit]
+Description=Geo AI thread extraction (after scrape)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=deploy-geo
+WorkingDirectory=/srv/geo
+ExecStart=/usr/bin/docker compose --env-file .env --env-file .env.deploy run --rm ai-extractor

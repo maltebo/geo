@@ -131,23 +131,9 @@ docker compose run --rm scraper --mode full   # initial data load (or import leg
 
 ### Scrape schedule (host systemd timer)
 
-```ini
-# /etc/systemd/system/geo-scrape.service
-[Service]
-Type=oneshot
-User=deploy-geo
-WorkingDirectory=/srv/geo
-ExecStart=/usr/bin/docker compose run --rm scraper --mode incremental
-
-# /etc/systemd/system/geo-scrape.timer
-[Timer]
-OnCalendar=*-*-* 03:00:00
-Persistent=true
-[Install]
-WantedBy=timers.target
-```
-Add a second service/timer with `--mode full` on a monthly `OnCalendar` for the
-full reconciliation sweep.
+The host units live in `deploy/systemd/` (nightly incremental scrape, monthly
+full scrape, AI extraction chained after each successful scrape). See
+`deploy/systemd/README.md` for installation.
 
 ### Backups
 
