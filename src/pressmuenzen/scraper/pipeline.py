@@ -116,9 +116,10 @@ async def _scrape_topic(source, region, topic, stats, new_machine_ids) -> None: 
         stats.errors.append(f"fetch {topic.url}: {exc}")
         log.warning("topic fetch failed", url=topic.url, error=str(exc))
         return
-    if machine is None or not machine.is_location_entry:
+    if machine is None:
         return
-    stats.topics_parsed += 1
+    if machine.matches_template:
+        stats.topics_parsed += 1
     await _upsert_machine(machine, stats, new_machine_ids)
 
 

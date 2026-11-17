@@ -26,7 +26,8 @@ class ScrapedMachine:
     description: str = ""
     gps_text: str | None = None
     entry_date_text: str | None = None
-    is_location_entry: bool = True
+    # False for free-text entries without the forum's location template; feeds the canary only.
+    matches_template: bool = True
 
     def content_hash_input(self) -> str:
         """Stable string used for change detection (content_hash)."""
