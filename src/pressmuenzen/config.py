@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     # LLM calls per minute — stay below the free-tier RPM limit with a safety margin.
     # Gemini 3.1 Flash Lite allows 15 RPM; 10 RPM leaves a 33% buffer.
     ai_extract_rpm: int = Field(default=10, alias="AI_EXTRACT_RPM")
+    # A thread checked within this many days is not fetched again. Without it the
+    # most uncertain machines, whose threads rarely change, fill every nightly run.
+    ai_extract_recheck_days: int = Field(default=7, alias="AI_EXTRACT_RECHECK_DAYS")
 
     # Moderation
     # A machine the scraper has not re-seen for this many days is surfaced by the

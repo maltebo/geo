@@ -120,6 +120,7 @@ class Machine(Base):
     opening_hours: Mapped[str | None] = mapped_column(Text, nullable=True)
     thread_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_message_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Last thread check by the ai-extract job, with or without an LLM call.
     last_ai_analyzed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

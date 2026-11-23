@@ -1,24 +1,28 @@
 """Nightly AI extraction job.
 
-Picks up to ``budget`` machines ordered by coordinate uncertainty (no coords
-first, then lower-quality geocodes, then least-recently-analysed), fetches their
-full forum thread, sends it to the LLM, and persists extracted address candidates,
-opening hours, summaries, and — for detected moves — pending correction rows.
+Picks active machines ordered by coordinate uncertainty (no coords first, then
+lower-quality geocodes, then least-recently-checked), fetches their full forum
+thread, sends it to the LLM, and persists extracted address candidates, opening
+hours, summaries, and — for detected moves — pending correction rows.
 
-The budget counts *LLM calls made*, not rows picked. Threads whose content hash
-is unchanged since the last analysis are skipped after a single cheap fetch, so
-the budget does not erode on stale threads.
+The budget counts *LLM calls made*. A thread whose content hash is unchanged
+costs one fetch but no LLM call, and the job keeps picking until the budget is
+spent. Every check starts a recheck cooldown, so unchanged threads do not fill
+the next runs.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from aiolimiter import AsyncLimiter
-from sqlalchemy import asc, case, nulls_first, select
+from sqlalchemy import case, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pressmuenzen.ai.extract import ExtractionResult, extract_from_thread
 from pressmuenzen.config import get_settings
@@ -26,19 +30,49 @@ from pressmuenzen.db.engine import session_scope
 from pressmuenzen.db.models import AiExtractRun, Machine
 from pressmuenzen.db.repositories.corrections import CorrectionRepository
 from pressmuenzen.db.repositories.machines import MachineRepository
-from pressmuenzen.domain.models import CorrectionType, GpsSource
+from pressmuenzen.domain.models import CorrectionType, GpsSource, MachineStatus
 from pressmuenzen.logging import configure_logging, get_logger
 from pressmuenzen.scraper.elongated_coin import ElongatedCoinSource
 from pressmuenzen.scraper.geocoding import Geocoder
 
 log = get_logger("ai.job")
 
+# Bounds forum load (1 req/s) when many picked threads turn out unchanged.
+_MAX_FETCHES_PER_BUDGET_UNIT = 2
+
+
+class EmptyThreadError(Exception):
+    """The fetched thread has no post text; sending it to the LLM would be rejected."""
+
+
+@dataclass
+class MachineOutcome:
+    llm_called: bool
+    candidates_added: int = 0
+    corrections_enqueued: int = 0
+
+
+@dataclass
+class ExtractStats:
+    threads_fetched: int = 0
+    unchanged: int = 0
+    llm_calls: int = 0
+    candidates_added: int = 0
+    corrections_enqueued: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+PickFn = Callable[[int, frozenset[int]], Awaitable[list[Machine]]]
+ProcessFn = Callable[[Machine], Awaitable[MachineOutcome]]
+
 
 async def run_ai_extract(budget: int | None = None) -> None:
     configure_logging()
     settings = get_settings()
     effective_budget = budget if budget is not None else settings.ai_extract_nightly_budget
+    recheck_after = timedelta(days=settings.ai_extract_recheck_days)
     llm_limiter = AsyncLimiter(max_rate=settings.ai_extract_rpm, time_period=60.0)
+    started_at = datetime.now(UTC)
 
     log.info("ai-extract started", budget=effective_budget, rpm=settings.ai_extract_rpm)
 
@@ -48,104 +82,168 @@ async def run_ai_extract(budget: int | None = None) -> None:
         await session.flush()
         run_id = run.id
 
-    errors: list[str] = []
-    threads_fetched = 0
-    llm_calls = 0
-    candidates_added = 0
-    corrections_enqueued = 0
+    async def pick(limit: int, exclude: frozenset[int]) -> list[Machine]:
+        async with session_scope() as session:
+            return await pick_machines(
+                session, limit, exclude=exclude, now=started_at, recheck_after=recheck_after
+            )
+
+    async def extract(text: str) -> ExtractionResult:
+        async with llm_limiter:
+            return extract_from_thread(text)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         source = ElongatedCoinSource(client=client)
 
-        async with session_scope() as session:
-            machines = await _pick_machines(session, effective_budget)
+        async def process(machine: Machine) -> MachineOutcome:
+            return await process_machine(
+                machine,
+                fetch_thread=source.fetch_thread_text,
+                extract=extract,
+                now=datetime.now(UTC),
+            )
 
-        for machine in machines:
-            if llm_calls >= effective_budget:
-                break
-            try:
-                thread_text, msg_count = await source.fetch_thread_text(machine.source_url)
-                threads_fetched += 1
-                thread_hash = _sha256(thread_text)
+        stats = await drive_extraction(
+            budget=effective_budget,
+            max_fetches=effective_budget * _MAX_FETCHES_PER_BUDGET_UNIT,
+            pick=pick,
+            process=process,
+        )
 
-                if machine.thread_content_hash == thread_hash:
-                    log.debug("thread unchanged, skipping llm", machine_id=machine.id)
-                    # Still update the hash fields in case this is the first check.
-                    async with session_scope() as session:
-                        m = await session.get(Machine, machine.id)
-                        if m is not None:
-                            m.last_message_count = msg_count
-                            m.thread_content_hash = thread_hash
-                    continue
-
-                async with llm_limiter:
-                    result = extract_from_thread(thread_text)
-                llm_calls += 1
-                log.info(
-                    "llm extraction done",
-                    machine_id=machine.id,
-                    address_found=result.address_found,
-                    moved=result.moved_detected,
-                    opening_hours=result.opening_hours is not None,
-                )
-
-                async with session_scope() as session:
-                    repo = MachineRepository(session)
-                    corr_repo = CorrectionRepository(session)
-                    m = await session.get(Machine, machine.id)
-                    if m is None:
-                        continue
-
-                    _persist_thread_meta(m, thread_hash, msg_count)
-                    if result.summary:
-                        m.ai_summary = result.summary
-                    if result.opening_hours is not None:
-                        m.opening_hours = result.opening_hours.to_json()
-
-                    added, enqueued = await _process_location(repo, corr_repo, m, result)
-                    candidates_added += added
-                    corrections_enqueued += enqueued
-
-            except Exception as exc:  # noqa: BLE001 - per-machine isolation
-                msg = f"machine {machine.id} ({machine.source_url}): {exc}"
-                errors.append(msg)
-                log.warning("ai-extract error", machine_id=machine.id, error=str(exc))
-
-    status = "ok" if not errors else "partial"
+    status = "ok" if not stats.errors else "partial"
     async with session_scope() as session:
         db_run = await session.get(AiExtractRun, run_id)
         if db_run is not None:
             db_run.finished_at = datetime.now(UTC)
             db_run.status = status
-            db_run.threads_fetched = threads_fetched
-            db_run.llm_calls_made = llm_calls
-            db_run.candidates_added = candidates_added
-            db_run.corrections_enqueued = corrections_enqueued
-            db_run.errors_json = json.dumps(errors[:200]) if errors else None
+            db_run.threads_fetched = stats.threads_fetched
+            db_run.llm_calls_made = stats.llm_calls
+            db_run.candidates_added = stats.candidates_added
+            db_run.corrections_enqueued = stats.corrections_enqueued
+            db_run.errors_json = json.dumps(stats.errors[:200]) if stats.errors else None
 
     log.info(
         "ai-extract finished",
         status=status,
-        threads_fetched=threads_fetched,
-        llm_calls=llm_calls,
-        candidates_added=candidates_added,
-        corrections_enqueued=corrections_enqueued,
-        errors=len(errors),
+        threads_fetched=stats.threads_fetched,
+        unchanged=stats.unchanged,
+        llm_calls=stats.llm_calls,
+        candidates_added=stats.candidates_added,
+        corrections_enqueued=stats.corrections_enqueued,
+        errors=len(stats.errors),
     )
 
-    await _notify_admins(
-        status=status,
-        budget=effective_budget,
-        threads_fetched=threads_fetched,
-        llm_calls=llm_calls,
-        candidates_added=candidates_added,
-        corrections_enqueued=corrections_enqueued,
-        errors=errors,
+    from pressmuenzen.services.notifications import notify_admins
+
+    await notify_admins(
+        format_report(
+            status=status,
+            budget=effective_budget,
+            threads_fetched=stats.threads_fetched,
+            unchanged=stats.unchanged,
+            llm_calls=stats.llm_calls,
+            candidates_added=stats.candidates_added,
+            corrections_enqueued=stats.corrections_enqueued,
+            errors=stats.errors,
+        )
     )
 
 
-async def _pick_machines(session, budget: int) -> list[Machine]:  # type: ignore[no-untyped-def]
-    """Return up to ``budget`` active machines ordered by coordinate uncertainty."""
+async def drive_extraction(
+    *, budget: int, max_fetches: int, pick: PickFn, process: ProcessFn
+) -> ExtractStats:
+    """Process picked machines until ``budget`` LLM calls are made or no candidates remain."""
+    stats = ExtractStats()
+    # Failed machines keep their old timestamp, so without this they would be re-picked.
+    attempted: set[int] = set()
+
+    while stats.llm_calls < budget and stats.threads_fetched < max_fetches:
+        batch = await pick(budget - stats.llm_calls, frozenset(attempted))
+        if not batch:
+            break
+        for machine in batch:
+            if stats.llm_calls >= budget or stats.threads_fetched >= max_fetches:
+                break
+            attempted.add(machine.id)
+            stats.threads_fetched += 1
+            try:
+                outcome = await process(machine)
+            except Exception as exc:  # noqa: BLE001 - per-machine isolation
+                stats.errors.append(f"machine {machine.id} ({machine.source_url}): {exc}")
+                log.warning("ai-extract error", machine_id=machine.id, error=str(exc))
+                continue
+            if outcome.llm_called:
+                stats.llm_calls += 1
+            else:
+                stats.unchanged += 1
+            stats.candidates_added += outcome.candidates_added
+            stats.corrections_enqueued += outcome.corrections_enqueued
+
+    return stats
+
+
+async def process_machine(
+    machine: Machine,
+    *,
+    fetch_thread: Callable[[str], Awaitable[tuple[str, int]]],
+    extract: Callable[[str], Awaitable[ExtractionResult]],
+    now: datetime,
+) -> MachineOutcome:
+    """Fetch one thread and run the LLM on it unless its content is unchanged.
+
+    Raises EmptyThreadError after recording the check, so the cooldown applies.
+    """
+    thread_text, msg_count = await fetch_thread(machine.source_url)
+    thread_hash = _sha256(thread_text)
+    empty = not thread_text.strip()
+
+    if empty or machine.thread_content_hash == thread_hash:
+        async with session_scope() as session:
+            m = await session.get(Machine, machine.id)
+            if m is not None:
+                _persist_thread_meta(m, thread_hash, msg_count)
+                m.last_ai_analyzed_at = now
+        if empty:
+            raise EmptyThreadError("thread has no post text")
+        log.debug("thread unchanged, skipping llm", machine_id=machine.id)
+        return MachineOutcome(llm_called=False)
+
+    result = await extract(thread_text)
+    log.info(
+        "llm extraction done",
+        machine_id=machine.id,
+        address_found=result.address_found,
+        moved=result.moved_detected,
+        opening_hours=result.opening_hours is not None,
+    )
+
+    async with session_scope() as session:
+        repo = MachineRepository(session)
+        corr_repo = CorrectionRepository(session)
+        m = await session.get(Machine, machine.id)
+        if m is None:
+            return MachineOutcome(llm_called=True)
+
+        _persist_thread_meta(m, thread_hash, msg_count)
+        m.last_ai_analyzed_at = now
+        if result.summary:
+            m.ai_summary = result.summary
+        if result.opening_hours is not None:
+            m.opening_hours = result.opening_hours.to_json()
+
+        added, enqueued = await _process_location(repo, corr_repo, m, result)
+    return MachineOutcome(llm_called=True, candidates_added=added, corrections_enqueued=enqueued)
+
+
+async def pick_machines(
+    session: AsyncSession,
+    limit: int,
+    *,
+    exclude: frozenset[int],
+    now: datetime,
+    recheck_after: timedelta,
+) -> list[Machine]:
+    """Return up to ``limit`` active machines due for a check, most uncertain first."""
     # Mirror the _PRECEDENCE dict: higher value = less reliable = process first.
     precedence_case = case(
         (Machine.gps_source == GpsSource.NONE.value, 99),
@@ -159,13 +257,22 @@ async def _pick_machines(session, budget: int) -> list[Machine]:  # type: ignore
     )
     stmt = (
         select(Machine)
-        .where(Machine.status == "active")
+        .where(
+            Machine.status == MachineStatus.ACTIVE,
+            or_(
+                Machine.last_ai_analyzed_at.is_(None),
+                Machine.last_ai_analyzed_at <= now - recheck_after,
+            ),
+        )
         .order_by(
             precedence_case.desc(),
-            nulls_first(asc(Machine.last_ai_analyzed_at)),
+            Machine.last_ai_analyzed_at.asc().nulls_first(),
+            Machine.id,
         )
-        .limit(budget)
+        .limit(limit)
     )
+    if exclude:
+        stmt = stmt.where(Machine.id.not_in(exclude))
     rows = await session.execute(stmt)
     return list(rows.scalars().all())
 
@@ -226,30 +333,28 @@ async def _process_location(
                 address=result.address_value,
             )
 
-    machine.last_ai_analyzed_at = datetime.now(UTC)
     return candidates_added, corrections_enqueued
 
 
-async def _notify_admins(
+def format_report(
     *,
     status: str,
     budget: int,
     threads_fetched: int,
+    unchanged: int,
     llm_calls: int,
     candidates_added: int,
     corrections_enqueued: int,
     errors: list[str],
-) -> None:
-    from pressmuenzen.services.notifications import notify_admins
-
-    skipped = threads_fetched - llm_calls
+) -> str:
     status_line = "OK" if status == "ok" else f"PARTIAL ({len(errors)} Fehler)"
 
     lines = [
         f"AI-Extract abgeschlossen — {status_line}",
-        f"Threads geladen: {threads_fetched}/{budget}"
-        + (f" ({skipped} unverändert, kein LLM-Aufruf)" if skipped else ""),
-        f"LLM-Aufrufe: {llm_calls} | Neue Koordinaten: {candidates_added} | Umzugs-Hinweise: {corrections_enqueued}",
+        f"Threads geladen: {threads_fetched}"
+        + (f" ({unchanged} unverändert, kein LLM-Aufruf)" if unchanged else ""),
+        f"LLM-Aufrufe: {llm_calls}/{budget} | Neue Koordinaten: {candidates_added}"
+        f" | Umzugs-Hinweise: {corrections_enqueued}",
     ]
     if corrections_enqueued:
         lines.append("→ Umzugs-Hinweise bitte über /queue prüfen und bestätigen.")
@@ -260,8 +365,7 @@ async def _notify_admins(
             lines.append(f"  • {e}")
         if len(errors) > 5:
             lines.append(f"  … und {len(errors) - 5} weitere (ai_extract_runs.errors_json)")
-
-    await notify_admins("\n".join(lines))
+    return "\n".join(lines)
 
 
 def _persist_thread_meta(machine: Machine, thread_hash: str, msg_count: int) -> None:
