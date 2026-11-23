@@ -79,19 +79,65 @@ _RESPONSE_SCHEMA = {
     "required": ["address", "moved", "opening_hours", "summary"],
 }
 
+# The address value goes unchanged into a free-form Nominatim query, so the
+# prompt forces a geocoder-friendly format. The confidence levels map to
+# GpsSource precedence in job.py (low = city-level only).
 _SYSTEM_PROMPT = """\
-You are extracting structured information from a German forum thread about a \
-Pressmuenze (elongated coin) machine. Extract exactly what the thread says — do \
-not infer or hallucinate. If information is absent, set found=false or \
-detected=false and leave value/new_address empty.
+You extract structured information from a German forum thread about a \
+Pressmuenze (elongated coin) machine. Posts are separated by lines of "---"; \
+each post starts with the author in brackets. Posts are in chronological order.
 
-Fields to extract:
-- address: The physical location address of the machine, if explicitly mentioned \
-in any post (not just implied by the machine name). Provide full address including \
-street, house number, city where available.
-- moved: Whether a post explicitly states the machine has relocated to a new address.
-- opening_hours: Operating hours of the machine or its host venue, if mentioned.
-- summary: One to three sentences summarising the thread (German or English).
+Use only what the thread says. Do not use your own knowledge to add a street, \
+house number or postal code that no post gives. If information is absent, set \
+found=false or detected=false and leave value/new_address empty.
+
+## address
+
+The location where the machine stands NOW. The value is sent directly to a \
+geocoder (OpenStreetMap Nominatim), so it must be a plain search query that a \
+geocoder can resolve.
+
+Format, with each part only when the thread gives it:
+  "<street> <house number>, <postal code> <city>, <country>"
+If no post gives a street, use the name of the venue that hosts the machine:
+  "<venue name>, <postal code> <city>, <country>"
+
+Rules:
+- Country: write the country name in German ("Deutschland", "Österreich", \
+"Schweiz", "Niederlande", ...). Add it when the thread makes the country clear; \
+otherwise leave it out.
+- Remove everything a geocoder cannot resolve: position inside the building \
+("im Eingangsbereich", "neben der Kasse", "1. OG"), directions, opening hours, \
+comments, quotes.
+- Write a venue name as its official name ("Zoo Leipzig", "Burg Eltz"), not as a \
+description ("der Zoo dort").
+- Give exactly one location. If the posts give more than one, use the most \
+recent one. Ignore addresses of the operator, the seller or a company office.
+- Never return only a country or a region.
+
+confidence:
+- "high": a post gives street and house number, and the city or postal code.
+- "medium": a post gives a street without a house number, or a named venue \
+together with its city.
+- "low": a post gives only a city, district or village, or the address is \
+ambiguous.
+
+## moved
+
+detected=true only if a post explicitly says that the machine was moved to a \
+different location. A machine that was removed, replaced, or is out of order is \
+not a move. Write new_address in the same format as address. If the posts \
+report a move, address also contains the new location.
+
+## opening_hours
+
+Operating hours of the machine or its host venue, if a post gives them. Days are \
+full English names ("Monday" ... "Sunday"). Times are "HH:MM", 24-hour clock. \
+Put seasonal rules and exceptions into notes.
+
+## summary
+
+One to three sentences in German that summarise the thread.
 """
 
 
